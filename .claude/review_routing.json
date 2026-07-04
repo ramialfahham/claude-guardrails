@@ -1,0 +1,16 @@
+{
+  "_comment": "Which reviewers are REQUIRED for which staged files. 'always' run on every substantive commit. Patterns use fnmatch (a single * also matches across /). This is the general guardrails default; add your own paths/reviewers to customise a repo's routing. Commits whose files ALL match artifact_only are exempt (bookkeeping), except anything in artifact_only_never.",
+  "always": ["scope-auditor"],
+  "paths": {
+    "scripts/*": ["cto-reviewer"],
+    ".claude/tests/*": ["cto-reviewer"],
+    ".github/workflows/*": ["cto-reviewer"],
+    "requirements*.txt": ["cto-reviewer"],
+    "*hooks/*": ["cto-reviewer"],
+    ".claude/agents/*": ["cto-reviewer"],
+    ".mcp.json": ["cto-reviewer"],
+    ".cursor/mcp.json": ["cto-reviewer"]
+  },
+  "artifact_only": [".claude/task/*", ".claude/active_work.md"],
+  "artifact_only_never": [".claude/task/contract.md"]
+}

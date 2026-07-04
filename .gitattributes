@@ -1,0 +1,2 @@
+# Shell scripts must stay LF so they run when cloned on Linux/macOS.
+*.sh text eol=lf

@@ -1,0 +1,44 @@
+name: CI
+
+# Hermetic checks for the repo's guardrails: run the hook tests, validate the JSON
+# config, and byte-compile the hooks. No external auth or services.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run hook tests
+        run: |
+          set -e
+          for f in .claude/tests/test_*.py; do
+            echo "--- $f ---"
+            python "$f"
+          done
+
+      - name: Validate JSON config
+        run: |
+          set -e
+          for f in .claude/settings.json .claude/review_routing.json; do
+            echo "--- $f ---"
+            python -m json.tool "$f" > /dev/null
+          done
+
+      - name: Byte-compile hooks
+        run: python -m compileall -q .claude/hooks
+
+      - name: Check shell scripts
+        run: |
+          set -e
+          for f in .claude/hooks/*.sh scripts/*.sh; do
+            echo "--- $f ---"
+            bash -n "$f"
+          done

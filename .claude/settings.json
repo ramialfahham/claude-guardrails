@@ -1,0 +1,78 @@
+{
+  "_comment": "Repo-scoped guardrail hooks. Paths use ${CLAUDE_PROJECT_DIR} so they resolve to this repo's own .claude/hooks. All hooks fail open (a hook bug never blocks work) and self-gate on the real command. Claude Code prompts to trust these on first use.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/preflight.sh\"",
+            "statusMessage": "Checking Python is on PATH..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/handover_in.py\"",
+            "statusMessage": "Loading active-work handover..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/branch_discipline.py\"",
+            "statusMessage": "Branch discipline check..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/commit_review_gate.py\"",
+            "statusMessage": "Review gate: checking the change was reviewed..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre_push_gate.py\"",
+            "statusMessage": "Pre-push checklist..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/handover_out.py\"",
+            "statusMessage": "Handover write-out reminder..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/handover_plan_gate.py\"",
+            "statusMessage": "Plan-back gate..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_implement_gate.py\"",
+            "statusMessage": "Plan to implementation checklist..."
+          }
+        ]
+      }
+    ]
+  }
+}
