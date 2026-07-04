@@ -1,2 +1,5 @@
-# Shell scripts must stay LF so they run when cloned on Linux/macOS.
-*.sh text eol=lf
+# Normalize all text files to LF in the index and on checkout, so the working tree
+# is byte-identical across Windows dev and Linux CI. Git auto-detects binary files
+# and leaves them untouched. This keeps shell scripts runnable and gives repos that
+# bootstrap or sync from here deterministic bytes.
+* text=auto eol=lf
