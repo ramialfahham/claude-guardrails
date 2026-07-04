@@ -1,7 +1,7 @@
 ---
 description: Rebase the current feature branch onto its base (default main), auto-resolving only .claude/task/* conflicts, then force-push with lease.
 argument-hint: "[base-branch]"
-allowed-tools: Bash(git branch --show-current), Bash(git status --porcelain), Bash(git rev-parse *), Bash(git fetch *), Bash(git diff *), Bash(git -c core.editor=true rebase *), Bash(git rebase --abort), Bash(git checkout --theirs *), Bash(git add *), Bash(git push --force-with-lease *), Bash(sha256sum *), Bash(grep *)
+allowed-tools: Bash(git branch --show-current), Bash(git status --porcelain), Bash(git rev-parse *), Bash(test -d *), Bash(git fetch *), Bash(git diff *), Bash(git -c core.editor=true rebase *), Bash(git rebase --abort), Bash(git checkout --theirs *), Bash(git add *), Bash(git push --force-with-lease *), Bash(sha256sum *), Bash(grep *)
 ---
 
 Rebase the current branch onto its base and force-push, resolving ONLY the
@@ -12,11 +12,16 @@ moment any guard fails. Never resolve a conflict outside `.claude/task/`.
 Base branch = `$1` if given, else `main`.
 
 ## 1. Guards (stop, do nothing, if any fails)
-- **No operation already in progress:** if either `git rev-parse --verify -q REBASE_HEAD`
-  or `git rev-parse --verify -q MERGE_HEAD` succeeds (a rebase OR a merge is mid-flight),
-  STOP: "finish or abort the in-progress rebase/merge first (`git rebase --continue|--abort`
-  or `git merge --continue|--abort`)." Do not start a rebase on top of it. (A mid-merge
-  also trips the clean-tree guard below; check `MERGE_HEAD` explicitly for a precise message.)
+- **No operation already in progress** — do NOT use `REBASE_HEAD`: it lingers as a stale
+  ref after any rebase finishes, so it false-positives (it exists whenever the repo has
+  ever rebased). Detect a live rebase by its state directory, and a live merge by
+  `MERGE_HEAD` (which git *does* clear on completion/abort):
+  - `test -d "$(git rev-parse --git-path rebase-merge)"` OR
+    `test -d "$(git rev-parse --git-path rebase-apply)"` → a rebase is mid-flight.
+  - `git rev-parse --verify -q MERGE_HEAD` succeeds → a merge is mid-flight.
+  If any holds, STOP: "finish or abort the in-progress rebase/merge first
+  (`git rebase --continue|--abort` or `git merge --continue|--abort`)." Do not start on
+  top of it. (A mid-op also trips the clean-tree guard below; these give a precise message.)
 - **On a feature branch:** `git branch --show-current` — if empty (detached HEAD) or
   `main`/`master`, STOP: "sync-branch only runs on a feature branch."
 - **Clean tree:** if `git status --porcelain` prints ANY line, STOP: "commit or stash

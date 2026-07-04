@@ -1,39 +1,35 @@
 # Review
 
-diff_sha256: 90cbb9585c766d5a2a39590d4c53d6ebac664312c093f873e7e2c835e8352a12
+diff_sha256: 27dea255f2dc4a5ddd387c0d90e37248687310d317522f1ebdf3a1f7644f825a
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Scope + owner authority: all four changed files (`sync-branch.md`, `review_routing.json`,
-  `working-agreement.md`, `contract.md`) are inside `scope_paths`; the routing tightening
-  and the unattended-run polish are both recorded in `amendments` with owner authority
-  ("everything that reduces friction / makes the guardrails solid"; "ship it and polish").
-  The routing change is a tightening (adds cto-reviewer for `.claude/commands/*`), not a
-  weakening; the §3 wording was flagged owner-adjustable.
-- Space-safety: conflict resolution quotes paths (`git checkout --theirs -- "<path>"`) and
-  lists conflicts with `-z`; the command is purely additive and weakens no existing guard.
+- Scope + no silent decision: the changed files (`sync-branch.md`, `contract.md`; plus the
+  already-approved `working-agreement.md` / `review_routing.json` carried on the branch) are
+  all in `scope_paths`; the dogfood bug fix is recorded as an amendment with rationale. The
+  fix makes the guard STRICTER/accurate (corrects a false-positive), not looser — no
+  guardrail weakened.
+- Doc-sync intact: working-agreement §3 and the routing entry remain consistent with the
+  command; all changes recorded in the contract.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- allowed-tools completeness/least-privilege: enumerated all 17 git/sha256sum/grep
-  invocations the recipe can run; each matches one of the 12 grants and every grant is
-  exercised (no gaps, no dead permissions). The env-prefix (`GIT_EDITOR=`) and pipe
-  (`| sha256sum`) shapes from the prior ESCALATE are gone — replaced by
-  `git -c core.editor=true rebase` and `git diff --output=<scratch>` + `sha256sum <file>`
-  (builder verified byte-identical hashes to the pipe on empty and non-empty diffs).
-- Safety properties all hold: explicit `MERGE_HEAD`/`REBASE_HEAD` in-progress guard;
-  correct rebase `--theirs` (the replayed branch commit); fail-closed "do NOT push" on any
-  before/after or review.md fingerprint mismatch; unconditional abort on any conflict
-  outside `.claude/task/`; `--force-with-lease` (never plain `--force`). Scratch diffs live
-  in `.git/` (never tracked, always overwritten before read; worktree-isolated), so no
-  stale-file false-trip; repo commit/push hooks self-gate on commit/push only and don't
-  intersect this recipe's rebase/checkout/diff calls.
+- Detection correctness across worktree types and rebase modes: `git rev-parse --git-path
+  rebase-merge`/`rebase-apply` resolves per-worktree (worktree-safe, unlike raw `.git/…`);
+  those dirs exist for the full lifetime of interactive/non-interactive/`--merge` rebases and
+  are removed by git on completion/abort, so `test -d` cannot false-negative mid-rebase or
+  false-positive when idle — the exact defect being fixed. `MERGE_HEAD` (unchanged) is
+  git-cleared, so it stays reliable. (Confirmed a rebase can pause with a clean tree, so a
+  dedicated state-dir check is genuinely needed, not redundant with the clean-tree guard.)
+- allowed-tools coverage: `test -d "$(git rev-parse --git-path rebase-merge)"` decomposes
+  into outer `test -d` (new `Bash(test -d *)`, scoped narrowly, not `Bash(test *)`) and inner
+  `git rev-parse` (existing grant) — both exercised, no gap. All other steps byte-identical to
+  the previously-PASSed recipe (`--theirs`, abort on non-`.claude/task/` conflict, fail-closed
+  before/after + review.md fingerprint, `--force-with-lease`).
 
-Review history: cto-reviewer FAIL (merge-guard/routing/dead-grep) then ESCALATE
-(allowed-tools coverage) were both resolved in-diff; scope-auditor PASS throughout.
-Reviewers consumed `.claude/task/review_input.patch` (their Input #1).
-
-Verification (owner-run): 27 tests pass; JSON valid; `git diff --output` + `sha256sum`
-empirically byte-equal to the piped form; `git -c core.editor=true` parses.
+Origin of this fix: dogfooding `/sync-branch` on its own branch to resolve PR #3's conflict
+(after PR #2 merged) exposed that `REBASE_HEAD` lingers as a stale ref and false-positived
+the in-progress guard. Builder empirically verified old check false-positives, new check is
+correct. 27 tests pass; JSON valid.

@@ -47,3 +47,13 @@ amendments:
     `git diff --output=<scratch>` + `sha256sum <file>`, so every step matches a single
     `allowed-tools` grant and cannot trigger a permission prompt. `allowed-tools` tightened
     to the exact command forms used.
+  - 2026-07-04 — DOGFOOD BUG FIX: ran `/sync-branch` on this very branch to resolve PR #3's
+    own conflict after PR #2 merged, which exposed that the `REBASE_HEAD` guard
+    false-positives — `REBASE_HEAD` lingers as a stale ref after ANY rebase, so the guard
+    would wrongly refuse to run whenever the repo has ever rebased. Replaced it with the
+    canonical rebase-state-directory check (`test -d "$(git rev-parse --git-path
+    rebase-merge)"` / `rebase-apply`, worktree-safe); kept `MERGE_HEAD` (which git clears).
+    Empirically verified old check false-positives and new check is correct. Added
+    `Bash(test -d *)` to `allowed-tools`. (The two blinded reviewers and the builder had
+    validated the guard's logic but not `REBASE_HEAD`'s git semantics — caught only by
+    actually running the command.)
