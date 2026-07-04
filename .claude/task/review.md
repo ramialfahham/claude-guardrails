@@ -1,32 +1,35 @@
 # Review
 
-diff_sha256: 3521b17266376723871832ce3a8563a983da2089fc8e15d843e2281e330dc9b8
+diff_sha256: 27dea255f2dc4a5ddd387c0d90e37248687310d317522f1ebdf3a1f7644f825a
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Branding string `claude-guardrails:` (reserved owner decision): resolved — the
-  contract's `decisions_reserved` and `amendments` record the owner's approval via
-  "go ahead as recommended" on the battle-test report, which named that exact string
-  (2026-07-04). Prior ESCALATE cleared.
-- Test skip semantics: `unittest.SkipTest` reports true skips (not false passes) in
-  bootstrapped repos; findings #3–#5 left untouched as the contract states; diff
-  stayed inside `scope_paths`.
+- Scope + no silent decision: the changed files (`sync-branch.md`, `contract.md`; plus the
+  already-approved `working-agreement.md` / `review_routing.json` carried on the branch) are
+  all in `scope_paths`; the dogfood bug fix is recorded as an amendment with rationale. The
+  fix makes the guard STRICTER/accurate (corrects a false-positive), not looser — no
+  guardrail weakened.
+- Doc-sync intact: working-agreement §3 and the routing entry remain consistent with the
+  command; all changes recorded in the contract.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- pytest skip-vs-pass: `raise unittest.SkipTest(reason)` in plain test functions is
-  caught by pytest's exception-based skip protocol and reports as SKIPPED (observed
-  `4 skipped` with `-ra` in a bootstrapped repo; `4 passed` real runs in the kit).
-  No `print+return` false-pass pattern remains.
-- `__main__` runner: `except unittest.SkipTest` precedes `except Exception`, so skips
-  are not miscounted as failures and an all-skip run exits 0; preflight.sh emits valid
-  JSON and always `exit 0` (fails open).
+- Detection correctness across worktree types and rebase modes: `git rev-parse --git-path
+  rebase-merge`/`rebase-apply` resolves per-worktree (worktree-safe, unlike raw `.git/…`);
+  those dirs exist for the full lifetime of interactive/non-interactive/`--merge` rebases and
+  are removed by git on completion/abort, so `test -d` cannot false-negative mid-rebase or
+  false-positive when idle — the exact defect being fixed. `MERGE_HEAD` (unchanged) is
+  git-cleared, so it stays reliable. (Confirmed a rebase can pause with a clean tree, so a
+  dedicated state-dir check is genuinely needed, not redundant with the clean-tree guard.)
+- allowed-tools coverage: `test -d "$(git rev-parse --git-path rebase-merge)"` decomposes
+  into outer `test -d` (new `Bash(test -d *)`, scoped narrowly, not `Bash(test *)`) and inner
+  `git rev-parse` (existing grant) — both exercised, no gap. All other steps byte-identical to
+  the previously-PASSed recipe (`--theirs`, abort on non-`.claude/task/` conflict, fail-closed
+  before/after + review.md fingerprint, `--force-with-lease`).
 
-Prior verdicts: cto-reviewer FAIL (skip-as-false-pass) and scope-auditor ESCALATE
-(branding not recorded) were both addressed in this diff and re-reviewed to PASS.
-
-Verification (owner-run): kit `.claude/tests/test_*.py` 27 passed; a re-bootstrapped
-non-dbt (R/Quarto) repo shows 23 passed + 4 skipped (was 3 failed); preflight prints
-`claude-guardrails:`; hooks byte-compile; JSON parses.
+Origin of this fix: dogfooding `/sync-branch` on its own branch to resolve PR #3's conflict
+(after PR #2 merged) exposed that `REBASE_HEAD` lingers as a stale ref and false-positived
+the in-progress guard. Builder empirically verified old check false-positives, new check is
+correct. 27 tests pass; JSON valid.

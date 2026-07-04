@@ -8,6 +8,7 @@
     "requirements*.txt": ["cto-reviewer"],
     "*hooks/*": ["cto-reviewer"],
     ".claude/agents/*": ["cto-reviewer"],
+    ".claude/commands/*": ["cto-reviewer"],
     ".mcp.json": ["cto-reviewer"],
     ".cursor/mcp.json": ["cto-reviewer"]
   },
