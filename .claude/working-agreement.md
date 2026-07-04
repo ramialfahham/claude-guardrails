@@ -50,6 +50,11 @@ branch buys nothing, commit to that branch instead.
 This is **hook-enforced**: a commit or push while on `main`/`master`, `gh pr merge`, and
 `git commit --amend`/`--no-verify` are all hard-blocked.
 
+If a branch falls behind `main` while under review (e.g. another PR merged first and the
+`.claude/task/*` bookkeeping now conflicts), run `/sync-branch`: it rebases onto `main`,
+auto-resolves only those bookkeeping files, refuses to touch real code conflicts,
+re-checks that the review still covers the code, then force-pushes with lease.
+
 ## 4. Quality
 
 - **No hacky solutions.** If the clean way takes longer, say so — don't ship a workaround
