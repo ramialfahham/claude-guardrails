@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unittest
 
 _KIT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _SCRIPT = os.path.join(_KIT_ROOT, "scripts", "bootstrap.sh")
@@ -38,6 +39,18 @@ _EXPECTED = [
 ]
 
 
+def _unavailable():
+    """Why this suite can't run here, or None if it can. bash is needed to run the
+    script at all; scripts/bootstrap.sh only exists in the KIT — a repo that was
+    itself bootstrapped gets the tests but not the script, so the suite must skip
+    there rather than fail (the copied tests would otherwise be red out of the box)."""
+    if not _BASH:
+        return "no bash on PATH"
+    if not os.path.isfile(_SCRIPT):
+        return "scripts/bootstrap.sh not present (a bootstrapped repo, not the kit)"
+    return None
+
+
 def _run(*args, cwd=None):
     return subprocess.run(
         [_BASH, _SCRIPT, *args],
@@ -46,9 +59,9 @@ def _run(*args, cwd=None):
 
 
 def test_fresh_bootstrap_lands_the_guardrails():
-    if not _BASH:
-        print("skip (no bash on PATH)")
-        return
+    reason = _unavailable()
+    if reason:
+        raise unittest.SkipTest(reason)
     with tempfile.TemporaryDirectory() as tmp:
         target = os.path.join(tmp, "repo")
         os.makedirs(target)
@@ -68,9 +81,9 @@ def test_fresh_bootstrap_lands_the_guardrails():
 
 
 def test_rerun_preserves_project_config_unless_forced():
-    if not _BASH:
-        print("skip (no bash on PATH)")
-        return
+    reason = _unavailable()
+    if reason:
+        raise unittest.SkipTest(reason)
     with tempfile.TemporaryDirectory() as tmp:
         target = os.path.join(tmp, "repo")
         os.makedirs(target)
@@ -89,18 +102,18 @@ def test_rerun_preserves_project_config_unless_forced():
 
 
 def test_refuses_to_bootstrap_the_kit_into_itself():
-    if not _BASH:
-        print("skip (no bash on PATH)")
-        return
+    reason = _unavailable()
+    if reason:
+        raise unittest.SkipTest(reason)
     res = _run(_KIT_ROOT)
     assert res.returncode != 0, "should refuse to target the kit itself"
     assert "itself" in (res.stderr + res.stdout).lower()
 
 
 def test_requires_a_target_argument():
-    if not _BASH:
-        print("skip (no bash on PATH)")
-        return
+    reason = _unavailable()
+    if reason:
+        raise unittest.SkipTest(reason)
     res = _run()
     assert res.returncode != 0, "missing target should be an error"
 
@@ -112,6 +125,8 @@ if __name__ == "__main__":
             try:
                 _fn()
                 print(f"ok   {_name}")
+            except unittest.SkipTest as e:
+                print(f"skip {_name}: {e}")
             except Exception as e:  # noqa: BLE001
                 _failed += 1
                 print(f"FAIL {_name}: {type(e).__name__}: {e}")
