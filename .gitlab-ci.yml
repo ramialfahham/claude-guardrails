@@ -1,0 +1,42 @@
+# Ported 1:1 from .github/workflows/ci.yml — the repo's only workflow, and the only one that
+# existed. Nothing was left behind: no other GitHub workflow, no cloud auth, no deploy, no
+# schedule to port.
+#
+# Hermetic checks for the repo's guardrails: run the hook tests, validate the JSON config, and
+# byte-compile the hooks. No external auth or services — so none of the WIF/keyless-auth
+# machinery in this skill's keyless-auth-gcp.md applies here.
+#
+# Trigger scope mirrors the original exactly: `push: branches: [main]` + `pull_request` (any
+# source branch) become the two workflow-level rules below. The second rule pins
+# $CI_PIPELINE_SOURCE == "push" explicitly — $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH alone is
+# also true for a web/api-triggered pipeline on the default branch, which the original could
+# never reach (no workflow_dispatch). No catch-all clause exists, so no other pipeline source
+# (schedule, web, api) can create a pipeline at all — the schedule trap (gitlab-ci-traps.md #1)
+# doesn't apply because there is no schedule to guard against.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+test:
+  image: python:3.11
+  script:
+    - |
+      set -e
+      for f in .claude/tests/test_*.py; do
+        echo "--- $f ---"
+        python "$f"
+      done
+    - |
+      set -e
+      for f in .claude/settings.json .claude/review_routing.json; do
+        echo "--- $f ---"
+        python -m json.tool "$f" > /dev/null
+      done
+    - python -m compileall -q .claude/hooks
+    - |
+      set -e
+      for f in .claude/hooks/*.sh scripts/*.sh; do
+        echo "--- $f ---"
+        bash -n "$f"
+      done

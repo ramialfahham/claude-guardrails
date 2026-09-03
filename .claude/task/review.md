@@ -1,35 +1,38 @@
 # Review
 
-diff_sha256: 27dea255f2dc4a5ddd387c0d90e37248687310d317522f1ebdf3a1f7644f825a
+diff_sha256: a511af1347666096d8c9a3988a2975996ce0d8b48217e013262175d082274ff7
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Scope + no silent decision: the changed files (`sync-branch.md`, `contract.md`; plus the
-  already-approved `working-agreement.md` / `review_routing.json` carried on the branch) are
-  all in `scope_paths`; the dogfood bug fix is recorded as an amendment with rationale. The
-  fix makes the guard STRICTER/accurate (corrects a false-positive), not looser — no
-  guardrail weakened.
-- Doc-sync intact: working-agreement §3 and the routing entry remain consistent with the
-  command; all changes recorded in the contract.
+- Trigger scope correctness across GitLab CI semantics — the `&& $CI_PIPELINE_SOURCE == "push"`
+  guard prevents web/api-triggered pipelines on the default branch from running; the workflow
+  rules contain only two conditional rules with no catch-all, so only MR events and push-to-main
+  trigger the pipeline, matching the GitHub original.
+- Port step-equivalence between GitHub Actions and GitLab CI — both CI files execute identical
+  test steps (hook tests, JSON validation, byte-compile, shell lint); syntax differs, function
+  is identical.
+- Scope paths and owner-reserved decisions — no files outside scope_paths modified;
+  `review_routing.json` correctly left untouched per the owner's explicit decision; the
+  trigger-scope fix is a technical correction, not a silently-made owner-level decision.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- Detection correctness across worktree types and rebase modes: `git rev-parse --git-path
-  rebase-merge`/`rebase-apply` resolves per-worktree (worktree-safe, unlike raw `.git/…`);
-  those dirs exist for the full lifetime of interactive/non-interactive/`--merge` rebases and
-  are removed by git on completion/abort, so `test -d` cannot false-negative mid-rebase or
-  false-positive when idle — the exact defect being fixed. `MERGE_HEAD` (unchanged) is
-  git-cleared, so it stays reliable. (Confirmed a rebase can pause with a clean tree, so a
-  dedicated state-dir check is genuinely needed, not redundant with the clean-tree guard.)
-- allowed-tools coverage: `test -d "$(git rev-parse --git-path rebase-merge)"` decomposes
-  into outer `test -d` (new `Bash(test -d *)`, scoped narrowly, not `Bash(test *)`) and inner
-  `git rev-parse` (existing grant) — both exercised, no gap. All other steps byte-identical to
-  the previously-PASSed recipe (`--theirs`, abort on non-`.claude/task/` conflict, fail-closed
-  before/after + review.md fingerprint, `--force-with-lease`).
+- Trigger-scope fix actually closes the gap, with no new gap introduced — verified
+  `CI_PIPELINE_SOURCE == "push"` is set only for real `git push` events (never web/api/schedule/
+  trigger), tag pipelines can't match either (empty `CI_COMMIT_BRANCH`), and `workflow:rules` has
+  no trailing catch-all, so no unmatched source can create a pipeline. Cross-checked all
+  reachability paths against the GitHub original — scope is now 1:1, not broader.
+- Script correctness — GitLab has no GitHub-Actions-style implicit `bash -eo pipefail`, so each
+  multi-line `for`-loop script block needs its own `set -e` to avoid silently swallowing a
+  mid-loop failure; confirmed all three loop blocks carry it.
+- Referenced paths and secrets — every path the script globs against exists (no empty-glob
+  passthrough risk); job is fully hermetic, no credentials/tokens/widened permissions anywhere.
+- Guard integrity / scope — `review_routing.json` has no `.gitlab-ci.yml` entry, matching the
+  owner's recorded decision rather than a silent omission; `.github/workflows/ci.yml` untouched
+  and still matches the port line-for-line.
 
-Origin of this fix: dogfooding `/sync-branch` on its own branch to resolve PR #3's conflict
-(after PR #2 merged) exposed that `REBASE_HEAD` lingers as a stale ref and false-positived
-the in-progress guard. Builder empirically verified old check false-positives, new check is
-correct. 27 tests pass; JSON valid.
+Prior round found one real defect (workflow rule 2 lacked a `$CI_PIPELINE_SOURCE == "push"`
+guard, letting web/api-triggered pipelines on `main` also run the job — broader than the GitHub
+original, which has no `workflow_dispatch`). Fixed and re-reviewed fresh by both reviewers above.
