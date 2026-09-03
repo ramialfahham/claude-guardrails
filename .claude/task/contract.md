@@ -1,59 +1,39 @@
 # Task contract
 
-objective: Add a `/sync-branch` slash command that rebases the current feature branch
-  onto its base (default `main`) and auto-resolves ONLY `.claude/task/*` bookkeeping
-  conflicts to the branch's versions — turning the recurring parallel-PR task-file
-  conflict into a one-command non-event, without ever auto-resolving real code.
+objective: Migrate the repo's CI from GitHub Actions to GitLab CI — add `.gitlab-ci.yml`
+  as a 1:1 port of the repo's only workflow (`.github/workflows/ci.yml`), verified by a
+  real pipeline run on a new GitLab project, with `.github/workflows/ci.yml` kept in place
+  for now.
 
 scope_paths:
-  - .claude/commands/sync-branch.md
-  - .claude/working-agreement.md
-  - .claude/review_routing.json
+  - .gitlab-ci.yml
   - .claude/task/contract.md
   - .claude/task/review.md
 
 decisions_reserved:
-  - Base branch defaults to `main`, overridable via an optional argument (owner
-    approved this design on 2026-07-04).
-  - The one-line discoverability wording added to working-agreement.md §3
-    (user-visible doc text) — owner may adjust.
+  - Whether to also route `.gitlab-ci.yml` through `cto-reviewer` in
+    `.claude/review_routing.json` — owner declined (2026-09-03); routing is unchanged,
+    left out of scope_paths.
+  - GitLab project visibility — owner chose public (2026-09-03), mirroring the guardrails
+    repo being consumed by other repos.
+  - Whether to remove `.github/workflows/ci.yml` once GitLab is verified — owner chose to
+    keep it for now (2026-09-03).
 
 done_when:
-  - `.claude/commands/sync-branch.md` exists with: guards (refuse when a rebase/merge is
-    already in progress, on main/master or detached HEAD, or on a dirty tree), fetch +
-    rebase onto the base, auto-resolve only when EVERY conflicted path is under
-    `.claude/task/` (space-safe; abort + hand back on any other conflict), a before/after
-    code-fingerprint check that STOPs before pushing if the rebase altered reviewed code
-    (plus a `review.md` `diff_sha256` match when present), and `git push --force-with-lease`.
-  - working-agreement.md §3 points at `/sync-branch` for falling-behind branches.
-  - Existing `.claude/tests/test_*.py` still pass; JSON parses; hooks byte-compile.
-  - scope-auditor + cto-reviewer PASS; CI green.
+  - `.gitlab-ci.yml` exists, ported 1:1 from `.github/workflows/ci.yml` (same steps,
+    same trigger scope: MR pipelines + push to the default branch only).
+  - A real pipeline has been run on `gitlab.com/rami.al-fahham/claude-guardrails` (not
+    just `glab ci lint` / YAML parsing) and the job log confirms every step actually
+    executed (hook tests, JSON validation, byte-compile, shell lint) — not just that the
+    pipeline went green.
+  - Branch protection on the GitLab project's default branch is read back and reported,
+    not assumed (project config that a push does not carry).
+  - scope-auditor PASSES; CI (GitHub, still active) stays green.
 
 amendments:
-  - 2026-07-04 — contract created for PR C (sync-branch command).
-  - 2026-07-04 — reviewer-driven hardening (cto-reviewer + scope-auditor): added an
-    in-progress-rebase guard, space-safe conflict-path handling, and a before/after code
-    fingerprint so the integrity check no longer depends on `review.md` existing.
-  - 2026-07-04 — second cto-reviewer round: added an explicit `MERGE_HEAD` check (not just
-    `REBASE_HEAD`) and dropped the plain-`git status` reference; made step 5 use `grep` to
-    read the recorded hash (removing the dead `grep` permission); and — scope widened with
-    owner authority ("everything that reduces friction / makes the guardrails solid") —
-    added `.claude/commands/*` to `review_routing.json` so command files durably require
-    cto-reviewer, matching the existing `.claude/agents/*` and `*hooks/*` routing. This is
-    a tightening (more review required), not a weakening.
-  - 2026-07-04 — polish for full unattended run (owner: "ship it and polish"; resolves the
-    third cto-reviewer ESCALATE): replaced the `GIT_EDITOR=` env prefix with
-    `git -c core.editor=true rebase`, and the `| sha256sum` pipes with
-    `git diff --output=<scratch>` + `sha256sum <file>`, so every step matches a single
-    `allowed-tools` grant and cannot trigger a permission prompt. `allowed-tools` tightened
-    to the exact command forms used.
-  - 2026-07-04 — DOGFOOD BUG FIX: ran `/sync-branch` on this very branch to resolve PR #3's
-    own conflict after PR #2 merged, which exposed that the `REBASE_HEAD` guard
-    false-positives — `REBASE_HEAD` lingers as a stale ref after ANY rebase, so the guard
-    would wrongly refuse to run whenever the repo has ever rebased. Replaced it with the
-    canonical rebase-state-directory check (`test -d "$(git rev-parse --git-path
-    rebase-merge)"` / `rebase-apply`, worktree-safe); kept `MERGE_HEAD` (which git clears).
-    Empirically verified old check false-positives and new check is correct. Added
-    `Bash(test -d *)` to `allowed-tools`. (The two blinded reviewers and the builder had
-    validated the guard's logic but not `REBASE_HEAD`'s git semantics — caught only by
-    actually running the command.)
+  - 2026-09-03 — contract created for the GitLab CI migration (`/migrate-to-gitlab` skill).
+  - 2026-09-03 — mid-task: discovered `glab`'s machine-wide stored GitLab credential had
+    been silently swapped to a project access token from an unrelated project
+    (`football-data-pipeline`), blocking `glab repo create`. Not caused by this session;
+    resolved by the owner outside this session. No merge/push/commit happened in this
+    repo while blocked — verified via `git log`/`git status` before and after.
