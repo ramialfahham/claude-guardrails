@@ -1,38 +1,44 @@
 # Review
 
-diff_sha256: a511af1347666096d8c9a3988a2975996ce0d8b48217e013262175d082274ff7
+diff_sha256: 1a9277426f581a22b47e54e324248a021f405756a4cb1a1f2770c8a9da756bce
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Trigger scope correctness across GitLab CI semantics — the `&& $CI_PIPELINE_SOURCE == "push"`
-  guard prevents web/api-triggered pipelines on the default branch from running; the workflow
-  rules contain only two conditional rules with no catch-all, so only MR events and push-to-main
-  trigger the pipeline, matching the GitHub original.
-- Port step-equivalence between GitHub Actions and GitLab CI — both CI files execute identical
-  test steps (hook tests, JSON validation, byte-compile, shell lint); syntax differs, function
-  is identical.
-- Scope paths and owner-reserved decisions — no files outside scope_paths modified;
-  `review_routing.json` correctly left untouched per the owner's explicit decision; the
-  trigger-scope fix is a technical correction, not a silently-made owner-level decision.
+- Lint enforcement correctness — DENYLIST exactly matches the contract's spec (15
+  tokens), whole-token matching via regex split (not substring); the pin-fires test
+  proves the check catches newly-introduced violations; all 5 shipped modules pass;
+  `_skeleton` correctly excluded from the directory scan.
+- Reviewer template consistency — all 6 templates share identical frontmatter shape
+  (name, description, tools, model, applies_when), all follow the PASS/FAIL/ESCALATE
+  output contract matching the existing `cto-reviewer.md`/`scope-auditor.md`, each has
+  concrete domain-specific hunt items, no name contains a denylisted token.
+- Scope and owner-reserved decisions — no file outside scope_paths touched; existing
+  `.claude/agents/cto-reviewer.md`, hooks, and CI files untouched per the contract's
+  deferred decisions; amendments log matches what was actually done.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- Trigger-scope fix actually closes the gap, with no new gap introduced — verified
-  `CI_PIPELINE_SOURCE == "push"` is set only for real `git push` events (never web/api/schedule/
-  trigger), tag pipelines can't match either (empty `CI_COMMIT_BRANCH`), and `workflow:rules` has
-  no trailing catch-all, so no unmatched source can create a pipeline. Cross-checked all
-  reachability paths against the GitHub original — scope is now 1:1, not broader.
-- Script correctness — GitLab has no GitHub-Actions-style implicit `bash -eo pipefail`, so each
-  multi-line `for`-loop script block needs its own `set -e` to avoid silently swallowing a
-  mid-loop failure; confirmed all three loop blocks carry it.
-- Referenced paths and secrets — every path the script globs against exists (no empty-glob
-  passthrough risk); job is fully hermetic, no credentials/tokens/widened permissions anywhere.
-- Guard integrity / scope — `review_routing.json` has no `.gitlab-ci.yml` entry, matching the
-  owner's recorded decision rather than a silent omission; `.github/workflows/ci.yml` untouched
-  and still matches the port line-for-line.
+- Whitespace bypass (prior FAIL) — `_TOKEN_SPLIT` now splits on `[-_\s]+`; traced
+  `check_name("chief reviewer")` → `["chief"]`; the new
+  `test_rejects_whitespace_separated_titles` exercises exactly this.
+- Frontmatter blind spot (prior FAIL) — `check_file()` unions denylist hits from both
+  filename and frontmatter `name:`, and flags a mismatch between them independently.
+  Traced `_frontmatter_name()`'s parsing against both crash candidates (no `---` at
+  all; only one `---`) — both fail safe to `None`, no exception.
+- Vacuous test (prior FAIL) — the three new tests write real fixture `.md` files via
+  `tempfile.TemporaryDirectory` and call `check_file()` on the path, genuinely
+  exercising the file/directory-scan path this time.
+- README attribution — the 28%/12%/24% statistic is now explicitly attributed to
+  `football-data-pipeline`'s own `review_routing.json` decision log.
+- Guard integrity, dependencies, secrets, cost — `.claude/hooks/**`, both CI files,
+  `bootstrap.sh`, and the existing `cto-reviewer.md` are untouched; both CI files
+  already glob `.claude/tests/test_*.py` and `review_routing.json` already routes
+  `scripts/*` to `cto-reviewer`, so no CI/routing edit was needed; no new dependency,
+  no credential-shaped content, no cost/frequency change beyond one more test file.
 
-Prior round found one real defect (workflow rule 2 lacked a `$CI_PIPELINE_SOURCE == "push"`
-guard, letting web/api-triggered pipelines on `main` also run the job — broader than the GitHub
-original, which has no `workflow_dispatch`). Fixed and re-reviewed fresh by both reviewers above.
+Prior round FAILed on three real defects (whitespace-bypass gap, frontmatter/filename
+mismatch blind spot, a test that didn't test what it claimed to). All three fixed and
+verified fresh above — verify by reading the actual code, not by trusting the fix
+description.
