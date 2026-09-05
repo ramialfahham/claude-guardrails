@@ -1,0 +1,10 @@
+{
+  "always": false,
+  "paths": [
+    "src/components/*",
+    "src/pages/*",
+    "*.tsx",
+    "*.jsx",
+    "*.vue"
+  ]
+}

@@ -1,41 +1,52 @@
 # Review
 
-diff_sha256: dcfa42e9a9243c4942f69961ee747caaf3f864823441879bfeb9eb286bb30cc1
+diff_sha256: 5a28e35d4008baf23daa7fef04a49f604610b9d0b1166b5e97d72b2ed32936b5
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Complete field validation coverage — `test_refuses_each_missing_required_field()`
-  iterates over all five required fields (name, description, tools, model,
-  applies_when), removes each individually from a real fixture, and asserts
-  `PromotionRefused`, the field name in the message, and no file written.
-- Error message precision — each refusal includes the missing field name as a
-  single-item list, so the substring assertion in the test matches exactly the
-  field that was actually removed.
-- Scope and decisions_reserved — all changes inside scope_paths; script remains
-  manual-only (no hook/CI/settings.json wiring); no file outside scope touched.
+- Union behavior on same-path routing — a path pattern legitimately routed by
+  two different fragments ends up with both reviewers listed, never one
+  overwriting the other (`if name not in bucket: bucket.append(name)`),
+  confirmed by `test_compose_unions_same_pattern_across_reviewers`.
+- Duplicate JSON key rejection — a hand-authored fragment/target with a literal
+  repeated key is rejected via the strict loader (`object_pairs_hook`) before
+  being trusted, confirmed by `test_duplicate_key_in_json_is_rejected`.
+- Two meanings of "always" — `platform-reviewer` (`applies_when: [always]`,
+  scaffold-time) has a routing fragment `"always": false` with paths (only
+  required when its territory is touched); `security-reviewer` (conditionally
+  included) has `"always": true` (unconfined to a path once included). Both
+  documented explicitly in `templates/reviewers/routing/README.md`, matching
+  the contract. No owner-level decision made silently; all files in scope_paths.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- Path traversal via frontmatter `name:` (prior FAIL) — `_SAFE_NAME` is an anchored
-  allowlist regex checked inside `validate_source()`, which runs before `dest_path`
-  construction and `shutil.copyfile` in both the default and `--force` branches.
-  Traced against all 4 fixture payloads plus additional hand-traced variants
-  (backslash, embedded dots, uppercase) — all rejected.
-- Regex drift between promote_reviewer.py and lint_reviewer_name.py (prior FAIL) —
-  confirmed promote_reviewer.py imports and reuses the actual `_FRONTMATTER_NAME`
-  compiled regex object from lint_reviewer_name.py (not a re-typed copy of the
-  pattern), so the two scripts share one source of truth for what "the name" is.
-- Non-UTF-8 source crash (prior FAIL) — the file read is wrapped in
-  `try/except UnicodeDecodeError` → `PromotionRefused`, while `FileNotFoundError`
-  still propagates untouched to its own handler in `main()`.
-- Guard integrity / cost — no CI or routing edit needed or made; `review_routing.json`
-  already routes `scripts/*`/`.claude/tests/*` to `cto-reviewer`; both CI files
-  already glob `test_*.py`.
+- Type-confusion fix (prior FAIL) — `_validate_fragment_shape` rejects a
+  fragment's `paths` if it isn't a list of strings (would otherwise iterate a
+  string character-by-character); `_validate_base_shape` is a SEPARATE check
+  for the base's different shape (`paths` is a `{pattern: [reviewer,...]}` map,
+  not a list) — confirmed each correctly distinguishes the two shapes rather
+  than one wrongly accepting the other's.
+- Atomic-write fix (prior FAIL) — `_write_atomic` writes to a temp file then
+  `os.replace()`s onto the target (atomic on both POSIX and Windows), cleaning
+  up the temp file on any exception; verified with a test that forces a real
+  `os.replace` failure and confirms no temp file is left behind, not just the
+  trivial success-path case.
+- Exception-boundary fix (prior FAIL) — `compose(base, fragments)` now sits
+  inside the same try/except as the file loads, catching the new
+  `MalformedRoutingError` too; `test_cli_refuses_malformed_fragment_and_leaves_target_untouched`
+  runs the real CLI as a subprocess and confirms a clean `REFUSED:` message,
+  non-zero exit, and the target file byte-for-byte untouched.
+- Minor note from before (data-engineer-reviewer fragment missing a "raw
+  landing" pattern) addressed — `raw/*` and `landing/*` added.
+- Fragment patterns cross-checked against each reviewer's own "territory"
+  description — all consistent, none overly broad.
 
-Prior round FAILed on three real defects: a path-traversal write vector via the
-frontmatter `name:` field, a regex-parsing inconsistency between this script and
-lint_reviewer_name.py that could let the two disagree on what "the name" is, and an
-unhandled crash on non-UTF-8 source files. All three fixed and independently
-re-verified above by reading the actual code, not the fix description.
+Prior round FAILed on three real defects (silent type-confusion on a
+malformed `paths` field, a non-atomic write that could corrupt an existing
+routing config on a mid-write crash, and a raw traceback instead of a clean
+refusal on malformed input). All three fixed and re-verified fresh against the
+current code — including one round where a stale pre-fix review had to be
+discarded and re-run, since it happened to complete after the patch snapshot
+but before the actual fix.

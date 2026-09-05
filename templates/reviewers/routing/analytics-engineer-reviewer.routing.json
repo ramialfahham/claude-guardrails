@@ -1,0 +1,9 @@
+{
+  "always": false,
+  "paths": [
+    "models/*",
+    "seeds/*",
+    "macros/*",
+    "*.sql"
+  ]
+}

@@ -1,50 +1,60 @@
 # Task contract
 
-objective: Phase 1b of the `claude-project-kit` plan — `scripts/promote_reviewer.py`,
-  a deliberate, manual way to copy a drafted reviewer (one hand-refined on a real
-  project, started from `templates/reviewers/_skeleton.md`) into the shared
-  `templates/reviewers/` library, so it's reusable next time instead of redrafted
-  from scratch. Closes the gap the owner raised: nothing currently feeds a proven
-  draft back into the library.
+objective: Phase 2 of the `claude-project-kit` plan — a routing fragment per
+  reviewer module (which paths route to it, or whether it's required on every
+  commit regardless of path) and `scripts/compose_routing.py`, which merges a
+  target project's `review_routing.json` with the fragments for whichever
+  reviewers were selected, safely (union same-pattern entries, catch a hand-
+  authoring duplicate-key mistake, never silently drop a reviewer).
 
 scope_paths:
-  - scripts/promote_reviewer.py
-  - .claude/tests/test_promote_reviewer.py
+  - templates/reviewers/routing/**
+  - scripts/compose_routing.py
+  - .claude/tests/test_compose_routing.py
   - .claude/task/contract.md
   - .claude/task/review.md
 
 decisions_reserved:
-  - This stays a manual, explicitly-invoked action, never automatic — owner's own
-    framing ("promoting is a judgment call that a draft has proven itself", plan
-    addendum 2026-09-05). This phase must not add any automatic-promotion path
-    (e.g. triggered by review count or usage).
+  - None new. This phase only adds data (routing fragments) and a merge script;
+    it doesn't wire anything into an actual project yet (no interview exists —
+    Phase 6). Naming/scope decisions already made in Phase 1's contract stand.
 
 done_when:
-  - `scripts/promote_reviewer.py SOURCE_MD` copies `SOURCE_MD` into
-    `templates/reviewers/<name>.md`, where `<name>` comes from the file's own
-    frontmatter `name:` field (not the source filename, which may live anywhere).
-  - Refuses (non-zero exit, no file written) when: the target name/frontmatter
-    fails `lint_reviewer_name.check_file`-equivalent checks (denylisted token, or
-    filename/frontmatter mismatch once copied); the source frontmatter still has
-    `draft: true`; the source frontmatter has no `applies_when` field; a file
-    already exists at the destination (no silent overwrite — pass `--force` to
-    replace deliberately).
-  - Refuses to promote a source file missing the required frontmatter fields this
-    library's existing modules all have (`name`, `description`, `tools`, `model`,
-    `applies_when`) — incomplete promotion produces a module Phase 2 can't route
-    correctly.
-  - `.claude/tests/test_promote_reviewer.py` (plain-Python, matches this repo's
-    `test_*.py` convention) proves every refusal path actually refuses — using
-    real fixture files via `tempfile`, not just asserting on library internals —
-    and proves a valid promotion actually writes the file with the right content.
-  - All existing `.claude/tests/test_*.py` still pass; JSON configs still parse;
-    hooks still byte-compile; shell scripts still lint.
+  - `templates/reviewers/routing/<name>.routing.json` exists for all 5 Phase 1
+    modules, each `{"always": bool, "paths": [<fnmatch pattern>, ...]}`. Four
+    (`platform`, `data-engineer`, `analytics-engineer`, `frontend`) route by
+    path, derived from that module's own "territory" description. One
+    (`security`) is `"always": true` — sensitive-data handling isn't confined
+    to specific paths the way the others are, so it can't be scoped by pattern
+    the same way.
+  - **Two distinct meanings of "always" are documented, not conflated**: Phase
+    1's `applies_when: [always]` on `platform-reviewer` means "always INCLUDE
+    this reviewer when scaffolding a project" — a selection-time decision. A
+    fragment's `"always": true` means "always REQUIRE this reviewer's sign-off
+    on every commit regardless of path" — a routing-time decision. They answer
+    different questions; `platform-reviewer`'s own fragment is path-routed
+    (`"always": false`), same as this repo's existing `cto-reviewer` is today.
+  - `scripts/compose_routing.py` exposes a pure function
+    `compose(base: dict, fragments: dict[str, dict]) -> dict` (testable without
+    touching disk) plus a CLI (`--target PATH --reviewers name1,name2`).
+    Composing: unions a pattern's reviewer list across fragments/base
+    (de-duped, never silently overwritten); appends an `"always": true`
+    fragment's reviewer name into the base's top-level `always` list (deduped);
+    loads every JSON file (fragments AND the target base) through a decoder
+    that REJECTS a literal duplicate key within one object — a hand-authoring
+    mistake `json.load` would otherwise silently resolve to "last value wins".
+  - `.claude/tests/test_compose_routing.py` (plain-Python, this repo's
+    `test_*.py` convention) proves: two fragments legitimately routing the same
+    pattern to different reviewers end up unioned, not one overwriting the
+    other; a literal duplicate JSON key in a fixture file is rejected before
+    trusting the loader; composing is idempotent (running it twice with the
+    same inputs doesn't duplicate entries); the 5 shipped fragments all parse
+    and match the `{"always": bool, "paths": [...]}` shape.
+  - All existing `.claude/tests/test_*.py` still pass; JSON configs still
+    parse; hooks still byte-compile; shell scripts still lint.
   - scope-auditor + cto-reviewer PASS on the staged diff.
 
 amendments:
-  - 2026-09-05 — contract created for Phase 1b, a small addition to the approved
-    plan (`C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`) raised by the
-    owner immediately after Phase 1 shipped. Built on top of
-    `feat/reviewer-module-library` (not yet merged) since it depends only on that
-    phase's `lint_reviewer_name.py`; push/MR held until that branch merges to keep
-    the diff clean.
+  - 2026-09-05 — contract created for Phase 2 of the approved plan
+    (`C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`). Built on
+    updated `main` (Phase 1 + 1b merged).

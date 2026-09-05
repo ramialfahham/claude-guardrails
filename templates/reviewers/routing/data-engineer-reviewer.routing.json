@@ -1,0 +1,10 @@
+{
+  "always": false,
+  "paths": [
+    "ingestion/*",
+    "extract/*",
+    "loaders/*",
+    "raw/*",
+    "landing/*"
+  ]
+}
