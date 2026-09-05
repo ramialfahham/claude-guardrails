@@ -1,0 +1,16 @@
+{
+  "always": false,
+  "paths": [
+    "scripts/*",
+    "*hooks/*",
+    ".claude/tests/*",
+    ".claude/agents/*",
+    ".claude/commands/*",
+    ".github/workflows/*",
+    ".gitlab-ci.yml",
+    "requirements*.txt",
+    "package*.json",
+    ".mcp.json",
+    ".cursor/mcp.json"
+  ]
+}
