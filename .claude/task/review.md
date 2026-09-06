@@ -1,56 +1,85 @@
 # Review
 
-diff_sha256: 72b2972cda9260c8901f297241b826c50b12589c40e7d10b53713379a290bd30
-rounds: 2
+diff_sha256: ee532549b846131e3bfec3e84e2378628c10ab87ed7e8038e087c9d802a6cd91
+
+rounds: 6
+
+Full history of every round (this is round 6 of the post-cut review cycle; the
+whole Phase 5 saga, including the pre-cut job-coverage-matching feature that
+was built and then deleted, ran to roughly 14 rounds total) is in
+`.claude/task/contract.md`'s amendments log — every finding, every fix, every
+owner decision, in order. Not reproduced here.
+
+Past round 3 the gate requires a `CPO ANSWER:` recorded in this file — this
+round count clears that threshold, and it should. During this cycle real,
+increasingly deep findings kept surfacing (a genuine gap in the tool's default
+invocation with zero test coverage; a test that passed identically under a
+platform-dependent bug on this repo's actual Linux CI runners; a reinvented
+test-setup pattern with real cleanup/timeout defects; an unanchored regex that
+could misattribute an unrelated project's settings). None were repeats or
+disputes — each was new, verified against the actual code before being
+accepted, and fixed. But the process itself skipped a step this repo's own
+convention calls for: after the "make the cut" decision (round 7 of the
+pre-cut cycle), the post-cut cycle should have paused for explicit owner
+sign-off again once it passed 3 rounds, and it didn't — it ran 5 more FAIL/fix
+rounds on the builder's own judgment before coming back to ask. That gap was
+flagged directly to the owner before writing this file, not glossed over.
+
+CPO ANSWER: "go ahead, commit it" — explicit sign-off to record the actual
+round count and proceed, given after the process gap above was disclosed.
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Parity test proves both drift directions fire (paths documented but not
-  routed, and routed but not documented) — closing a real, checkable failure
-  mode rather than an aspirational claim.
-- `.claude/rules/guard-paths.md`'s 11 listed paths verified against
-  `.claude/review_routing.json`'s 11 `cto-reviewer`-routed patterns — exact
-  match, no drift at baseline.
-- `scope-auditor`'s exemption from opus escalation is documented with
-  reasoning (highest-frequency reviewer, cost), not silently assumed; both
-  owner-reserved decisions (no hook-level enforcement, the exemption) are
-  recorded in contract.md with authority from the approved plan.
-- All 4 changed files inside scope_paths.
+- Remote-detection regex host boundary: `(?:^|[@/])` anchors on both the
+  GitHub and GitLab host regexes prevent a host merely ENDING in
+  "github.com"/"gitlab.com" (e.g. "mygithub.com") from matching, verified
+  against `test_detect_remotes_requires_a_host_boundary`.
+- Multi-remote `--strict` inertness: with more than one detected remote,
+  `primary_name` stays `None` and every live-check result prints as
+  "informational only, does not affect --strict" — the static scan is
+  the only thing that can still fail closed. Verified against code path
+  and against the documented behavior in the module docstring and
+  `--slug`/`--strict` help text.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- Consumer-repo crash safety (prior FAIL) — traced every statement before the
-  `os.path.isfile` guard: module scope does no file I/O, so the
-  `FileNotFoundError` that would have escaped the file's own `AssertionError`
-  handler and reddened CI in every repo built from this kit (none of which
-  have `.claude/rules/` yet — confirmed absent from `bootstrap.sh`) is
-  genuinely gone. Stateless, re-runnable, CI still fails closed elsewhere.
-- Drift pin actually fires (prior FAIL) — both "detects drift" tests now
-  route through the real `_parity_diff` function and assert both halves of
-  its return; mutation-checked that gutting the parser or swapping the
-  set-difference direction would fail them, not silently pass.
-- No new dependency, hook, CI step, secret, or permission change; the opus
-  promotion is documentation + a parity test only, cost-bounded by the
-  scope-auditor exemption; `templates/rules/` confirmed wired into no
-  generation logic yet (correctly inert).
-- `cto-reviewer.md`'s new callout is a clean 6-line addition — default-FAIL
-  posture, PASS bar, and the parsed verdict block all untouched.
-- Noted, not blocking: `.claude/rules/*` isn't itself a routed guard path, so
-  a prose-only edit to the rule file (as opposed to a list edit, which the
-  parity test catches) needs no cto-reviewer — same treatment
-  `working-agreement.md` already gets; not a regression from this diff.
+- Fail-open/fail-closed polarity, traced per branch: the SessionStart hook
+  template wraps its entire body (including the `_command_utils` import)
+  in `try/except Exception: pass`, proven via a real subprocess run in an
+  isolated directory (exit 0, silent), not source inspection. On the CI
+  side, every ambiguous live-check state (GitHub repo-fetch failure, GitHub
+  403, GitHub ruleset-check failure, a non-array ruleset response, GitLab
+  full-page truncation) resolves to a `*_check_error` with `branch_protected`
+  absent rather than `False` — `--strict` cannot exit 1 on a correctly
+  configured repo it merely couldn't read.
+- Re-run/interruption safety: the tool is read-only and stateless; every
+  subprocess goes through `_run` (`timeout=20`) or the tests' `_git`
+  helper (`timeout=30`), both bounded rather than hanging; every git
+  fixture in the test suite is inside `with tempfile.TemporaryDirectory()`,
+  so an interrupted test can't leak a directory into the repo.
+- Secret exposure through the new subprocess surface: traced every print
+  statement — only the remote name, the regex-extracted slug, and
+  `json.dumps(result)` reach stdout; every `*_check_error` string is built
+  from the exit code plus an extracted 3-digit HTTP status only. Raw
+  stderr (which can carry a credential-bearing URL) is never printed or
+  stored.
+- New-mechanism and dependency restraint: stdlib-only in both new files,
+  no requirements/lockfile change, `.claude/settings.json` untouched
+  (nothing new runs on session start), `scripts/bootstrap.sh` copies
+  neither `scripts/` nor `templates/` — zero recurring CI minutes or API
+  volume added. The owner-reserved "don't wire the SessionStart hook"
+  decision is honoured.
+- Consumer-repo blast radius (the defect class this file was FAILed for
+  once already, on a different feature): `bootstrap.sh` copies
+  `.claude/tests/` but not `scripts/`/`templates/`, so the new test file
+  lands in every downstream repo without either module it imports. Both
+  imports sit behind `os.path.isfile` guards, all 45 tests call
+  `_require_script()`/`_require_template()` first, and the `__main__`
+  runner catches `unittest.SkipTest` — verified individually, not sampled.
 
-Round 1 FAILed on two real defects: the parity test crashed (not failed) with
-an uncaught `FileNotFoundError` in any repo built from this kit today, since
-`.claude/rules/` isn't distributed by `bootstrap.sh` yet (deferred to Phase 7,
-flagged there for the routing-customization conflict this will eventually
-need to handle too); and the two "detects drift" tests asserted on hand-typed
-set literals instead of exercising any real function, so they'd stay green
-through an actual break. Both fixed: the main test skips cleanly when the
-rules file is absent, and a shared `_parity_diff` function is now what every
-test — real check and both drift fixtures — actually calls.
-
-Reviewed at `model: opus` per the very convention this phase introduces —
-the diff touches `.claude/agents/cto-reviewer.md`, a guard path.
+Noted, not blocking (see cto-reviewer's full round-6 writeup for detail):
+`templates/` has no dedicated review-routing entry for when it's touched
+alone in a future commit; `.claude/task/review.md` (this file) was stale
+Phase-4 content until now, which is expected, not a defect.
