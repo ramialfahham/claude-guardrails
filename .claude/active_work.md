@@ -1,70 +1,57 @@
 # Active work
 
-## `claude-project-kit` — Phase 1 merged, Phase 1b pending merge
+## `claude-project-kit` — Phase 3 IN PROGRESS
 
-Full plan: `C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md` (approved
-2026-09-03, amended 2026-09-05 to add Phase 1b). 7 phases + 1b, one task contract
-each.
+Full plan: `C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`. 7 phases +
+1b, one task contract each.
 
-**Phase 1 — reviewer module library + naming lint**: MERGED (MR !2, `b1ed2c9` on
-`main`). `templates/reviewers/{platform,security,data-engineer,analytics-engineer,
-frontend}-reviewer.md` + `_skeleton.md` fallback + `README.md`; `scripts/
-lint_reviewer_name.py` rejects corporate-title reviewer names as code. Also added
-`.gitignore` (repo had none). Full detail/review history in git log — not carrying
-forward as open work.
+**Merged**: Phase 1 (MR !2), Phase 1b (MR !3), Phase 2 (MR !4) — all on `main`,
+git history has full detail, not carrying forward as open work.
 
-**Phase 1b — promote-to-library**: MERGE-READY, not yet merged.
-- Branch: `feat/promote-reviewer`. MR:
-  https://gitlab.com/rami.al-fahham/claude-guardrails/-/merge_requests/3 — MR
-  pipeline green, job log confirms the new test actually ran.
-- Added `scripts/promote_reviewer.py`: copies a drafted reviewer (started from
-  `_skeleton.md`, refined on a real project) into `templates/reviewers/`, once
-  its `draft: true` flag is removed and required fields are all present.
-  Manual-only, by design — never wired to a hook/CI/count/schedule.
-- Review cycle: cto-reviewer FAILed round 1 on a real path-traversal write
-  vector (an unsanitized frontmatter `name:` could write outside
-  `templates/reviewers/`), a regex-parsing inconsistency with
-  `lint_reviewer_name.py`, and a crash on non-UTF-8 source files — all fixed
-  and re-verified PASS. scope-auditor also FAILed round 1 (test only covered
-  1 of 5 required fields) — fixed. Full detail in `.claude/task/review.md`.
+**Open, unmerged**: `!5` — handover-only bookkeeping update (no code), branch
+`chore/handover-after-phase2`. Also enabled the account's self-hosted runner
+(`ci-runner-01`) on this project, fixing a `ci_quota_exceeded` pipeline failure
+that was unrelated to any code change.
 
-**Owner decisions still open, carried in contract.md**: whether to eventually
-rename this repo to `claude-project-kit` (deferred — `dbt-agent-kit`'s
-`sync-base.sh` hardcodes this repo's GitHub URL, would need updating too);
-whether to rename the existing `.claude/agents/cto-reviewer.md` itself (deferred
-— this library only adds new, function-named modules so far).
+**IN PROGRESS right now**: Phase 3 — hardened git-discipline hooks, branch
+`feat/hardened-git-discipline`. This is the highest-scrutiny phase — it touches
+the commit gate every other commit in every kit-derived repo depends on.
+Scope: `branch_discipline.py` gains a commit-form allowlist (blocks `-a`/`-am`,
+pathspecs, chained `git add && commit`) + a `core.hooksPath` tamper check;
+`commit_review_gate.py` gains cumulative `base...HEAD` diff hashing (not
+staged-only) + a review-round cap; plus a new secret-leak scanning hook.
+**If you're picking this up fresh: this file was intentionally marked
+IN-PROGRESS at the start of the phase, not just updated at the end — check
+`git status`/`git log` on this branch for the actual current state before
+trusting the description above as complete.**
 
-**Next**: merge MR !3, then start Phase 2 (routing composition engine —
-`scripts/compose_routing.py`, consumes Phase 1's `applies_when` tags) as its own
-task contract. Do NOT jump ahead without a fresh contract.md — each phase is
-independently reviewed per the working agreement.
+**Owner decisions still open**: whether to rename this repo to
+`claude-project-kit` (deferred); whether to rename `.claude/agents/cto-reviewer.md`
+itself (deferred).
 
-**Minor cleanup noticed but NOT done (out of scope both times it came up)**:
-`.claude/hooks/__pycache__/*.pyc` files are tracked in git from before
-`.gitignore` existed — harmless, but worth a small standalone cleanup
-(`git rm -r --cached .claude/hooks/__pycache__`) sometime.
+**Minor cleanup noticed but still NOT done (came up 3+ times, out of scope
+every time)**: `.claude/hooks/__pycache__/*.pyc` files are tracked in git from
+before `.gitignore` existed — worth `git rm -r --cached .claude/hooks/__pycache__`
+as its own tiny standalone commit sometime.
 
 ## Also this session (2026-09-05)
 
-- Global `~/.claude/CLAUDE.md` created: plain-language communication rules
-  (always explain a bare reference like "PR #55" in the same sentence; short
-  answers by default) and token-saving habits (delegate broad search to
-  subagents, don't re-read just-written files, read narrowly, pin cheaper models
-  for mechanical reviewers). Applies to every project, not just this one.
-- Evaluated 6 open-source "save tokens" tools from a LinkedIn post (caveman,
-  claude-mem, serena, rtk, context-mode, jcodemunch) — verified real via web
-  search, not fabricated, but decided against installing any of them (caveman
-  trades response clarity for token count; claude-mem duplicates Claude Code's
-  built-in memory; third-party plugins are exactly the "global thing breaks
-  local" risk already flagged). Kept the underlying techniques as habits in the
-  global CLAUDE.md instead.
+- Global `~/.claude/CLAUDE.md` rewritten: critical-senior-engineer role (no
+  praise filler, push back on wrong assumptions with technical reasons, don't
+  fold under pushback without new evidence), status-first communication
+  (plain terms, done/broken/blocked, before any narrative), 95%-confidence
+  autonomy rule, code/repo hygiene (no inline comments by default, no
+  timestamps/authorship in code, no unsolicited files except where a repo's
+  own written rules require them), plus the earlier token-saving habits.
+  Applies to every project, not just this one.
+- Evaluated 6 open-source "save tokens" tools from a LinkedIn post — verified
+  real via web search but decided against installing any. Kept the underlying
+  techniques as habits in the global CLAUDE.md instead.
 
 ## Earlier, unrelated to the above
 
-GitLab CI migration (`.gitlab-ci.yml`) — fully done and merged, verified with a
-real push-to-main pipeline. Not carrying forward as open work.
+GitLab CI migration (`.gitlab-ci.yml`) — fully done and merged. Not open work.
 
-`football-data-pipeline`'s past auto-merge incident (a paused GitHub Actions
-workflow, `pr-autopilot.yml`) is resolved in that repo already, by the owner —
-not open work here. It directly informed Phase 5 of the claude-project-kit plan
-(CI-provider automation audit), which is why it's referenced in the plan file.
+`football-data-pipeline`'s past auto-merge incident is resolved in that repo
+already, by the owner — not open work here. It informed Phase 5 of the
+claude-project-kit plan (CI-provider automation audit).

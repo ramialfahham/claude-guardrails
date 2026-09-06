@@ -38,6 +38,12 @@
           {
             "type": "command",
             "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/secret_scan.py\"",
+            "statusMessage": "Scanning staged changes for credentials..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
             "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre_push_gate.py\"",
             "statusMessage": "Pre-push checklist..."
           },

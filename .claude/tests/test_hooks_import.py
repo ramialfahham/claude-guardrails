@@ -24,6 +24,7 @@ _HOOK_MODULES = [
     "handover_plan_gate",
     "plan_implement_gate",
     "pre_push_gate",
+    "secret_scan",
 ]
 
 

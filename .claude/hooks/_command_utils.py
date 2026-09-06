@@ -56,13 +56,37 @@ _GIT_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                       "--super-prefix"}
 
 
+_GROUP_LEAD = re.compile(r"^[({]+")
+_GROUP_TRAIL = re.compile(r"[)};]+$")
+
+
+def _degroup(toks: list[str]) -> list[str]:
+    """Strip a single layer of subshell/brace-group punctuation stuck to the
+    first and last token — `(git commit -m x)` and `{ git commit -m x; }`
+    tokenize with that punctuation attached (simple_commands splits on shell
+    operators, not parens/braces, so a `&&`/`;` INSIDE a group can already
+    separate `git` from its wrapper — this only needs to handle a group with
+    no such separator inside, e.g. wrapping a single command). NOT a real
+    shell parser: nested or multi-command groups aren't unwrapped, so a git
+    invocation buried deeper than one group level can still slip past."""
+    if not toks:
+        return toks
+    out = list(toks)
+    out[0] = _GROUP_LEAD.sub("", out[0])
+    out[-1] = _GROUP_TRAIL.sub("", out[-1])
+    return [t for t in out if t]
+
+
 def git_subcommand(toks: list[str]) -> str | None:
     """The git subcommand in a token list, skipping global options and their
     arguments, or None if this isn't a `git` invocation. So `git log --grep
     commit` returns 'log' (not a commit) while `git -c k=v commit` returns
     'commit'. Matching the subcommand — not a substring anywhere in the line —
     is what keeps the guards from tripping on read-only commands that merely
-    contain 'commit', and from missing a commit hidden behind global options."""
+    contain 'commit', and from missing a commit hidden behind global options.
+    Also degroups a single wrapping `(...)`/`{ ...; }` first, so `(git commit
+    -m x)` isn't invisible to every guard in this repo — see `_degroup`."""
+    toks = _degroup(toks)
     if not toks or toks[0] != "git":
         return None
     i = 1
@@ -76,6 +100,15 @@ def git_subcommand(toks: list[str]) -> str | None:
             continue
         return tok  # first non-option token is the subcommand
     return None
+
+
+def is_commit_subcommand(toks: list[str]) -> bool:
+    """True if `toks` is a `git commit` invocation that will actually commit.
+    `--dry-run` makes no commit at all, so a guard that fires on it anyway is
+    a false positive with no security value — this was independently
+    reimplemented three ways across the hooks here (one of them missing the
+    `--dry-run` exemption entirely, a real bug), so it lives here once now."""
+    return git_subcommand(toks) == "commit" and "--dry-run" not in toks
 
 
 _HEREDOC_MARK = re.compile(r"<<-?\s*'?\"?\w+")

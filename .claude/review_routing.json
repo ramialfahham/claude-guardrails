@@ -9,6 +9,8 @@
     "*hooks/*": ["cto-reviewer"],
     ".claude/agents/*": ["cto-reviewer"],
     ".claude/commands/*": ["cto-reviewer"],
+    ".claude/settings.json": ["cto-reviewer"],
+    ".claude/review_routing.json": ["cto-reviewer"],
     ".mcp.json": ["cto-reviewer"],
     ".cursor/mcp.json": ["cto-reviewer"]
   },

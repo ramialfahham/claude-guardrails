@@ -10,7 +10,12 @@ import sys
 _HOOKS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 sys.path.insert(0, _HOOKS)
 
-from _command_utils import git_subcommand  # noqa: E402
+from _command_utils import (  # noqa: E402
+    _degroup,
+    git_subcommand,
+    is_commit_subcommand,
+    simple_commands,
+)
 
 
 def test_plain_subcommand():
@@ -42,6 +47,44 @@ def test_non_git_is_none():
     assert git_subcommand("echo git commit".split()) is None
     assert git_subcommand("".split()) is None
     assert git_subcommand([]) is None
+
+
+def test_degroup_strips_wrapping_punctuation():
+    assert _degroup(["(git", "commit", "-m", "x)"]) == ["git", "commit", "-m", "x"]
+    assert _degroup(["{", "git", "commit", "-m", "x"]) == ["git", "commit", "-m", "x"]
+    assert _degroup(["git", "commit"]) == ["git", "commit"]  # unwrapped: unchanged
+    assert _degroup([]) == []
+
+
+def test_subshell_wrapped_commit_is_still_detected():
+    # (git commit -m x) — a single-command subshell with no operator inside,
+    # so simple_commands doesn't split it; without degrouping this would be
+    # invisible to every guard in the repo
+    for part in simple_commands("(git commit -m x)"):
+        assert git_subcommand(part.split()) == "commit"
+
+
+def test_brace_grouped_commit_is_still_detected():
+    # { git commit -m x; } splits on the internal ';', so the group's braces
+    # end up attached to different simple-commands than in the subshell case
+    parts = list(simple_commands("{ git commit -m x; }"))
+    assert any(git_subcommand(p.split()) == "commit" for p in parts)
+
+
+def test_is_commit_subcommand_excludes_dry_run():
+    # every guard that cares about a REAL commit shares this predicate now —
+    # a --dry-run commits nothing, so it must never read as a commit
+    assert is_commit_subcommand("git commit -m x".split()) is True
+    assert is_commit_subcommand("git commit --dry-run".split()) is False
+    assert is_commit_subcommand("git log --grep commit".split()) is False
+    assert is_commit_subcommand("git status".split()) is False
+
+
+def test_grouping_does_not_create_a_false_positive():
+    # a group around something that ISN'T a commit must still resolve to
+    # None, not accidentally become "commit" through overzealous stripping
+    for part in simple_commands("(git status)"):
+        assert git_subcommand(part.split()) != "commit"
 
 
 if __name__ == "__main__":
