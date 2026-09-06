@@ -90,11 +90,11 @@ instead of leaving you unknowingly unguarded.
 - **Repo-level, not a global plugin.** The config lives in the repo, is scoped to it, shows up
   in the diff, and needs no machine install. The cost is that each repo carries its own copy of
   `.claude/`; the benefit is no leakage, a visible per-repo trust decision, and nothing to install.
-- **Reviewers run blinded and adversarial.** Each reviewer sees the staged diff cold, with no
-  memory of the conversation that produced it — so the review catches what the author's context
-  talked them into.
+- **Reviewers run blinded and adversarial.** Each reviewer sees the branch's cumulative diff cold,
+  with no memory of the conversation that produced it — so the review catches what the author's
+  context talked them into.
 - **The commit gate hard-blocks; it isn't advice.** A commit is refused until the review matches
-  the staged diff and every required reviewer has passed.
+  the branch's current cumulative diff and every required reviewer has passed.
 - **Hooks fail open, guards fail closed.** A hook that errors lets you through — tooling shouldn't
   lock you out of your own repo. The guards whose whole job is to stop you (branch discipline, the
   review gate) block by design.
@@ -103,9 +103,11 @@ instead of leaving you unknowingly unguarded.
 
 1. You stage your change (`git add ...`).
 2. You run the reviewers the routing requires and write `.claude/task/review.md` (copy
-   `task/REVIEW_TEMPLATE.md`), pasting the staged-diff hash.
-3. `git commit` is blocked until the review matches the staged change, every required reviewer
-   passed, and any escalation has an answer.
+   `task/REVIEW_TEMPLATE.md`), pasting the diff hash (`commit_review_gate.py --diff-hash`) —
+   the branch's cumulative diff since it split from `main`, plus what's staged now, not just
+   this commit's own staged change.
+3. `git commit` is blocked until the review matches that cumulative diff, every required
+   reviewer passed, and any escalation has an answer.
 
 ## Related
 

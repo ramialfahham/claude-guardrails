@@ -31,11 +31,12 @@ Before committing, run the review cycle (the commit gate enforces it):
 
 1. Stage everything (`git add`).
 2. Run the reviewers the routing requires (`.claude/review_routing.json`) against the
-   staged diff — cold, read-only, adversarial.
+   cumulative branch diff (everything committed since the branch split from `main`,
+   plus what's staged now) — cold, read-only, adversarial.
 3. Write `.claude/task/review.md` (template: `REVIEW_TEMPLATE.md`) with each reviewer's
-   verdict and the staged-diff hash.
-4. `git commit` — blocked until the review matches the staged change, every required
-   reviewer passed, and any escalation has a recorded answer.
+   verdict and the diff hash (`python .claude/hooks/commit_review_gate.py --diff-hash`).
+4. `git commit` — blocked until the review matches the branch's current cumulative
+   diff, every required reviewer passed, and any escalation has a recorded answer.
 
 Trace before you change a shared interface or module: know what depends on it first.
 
@@ -47,8 +48,11 @@ refspec (`git push origin <branch>`), open a PR, wait for CI + the user's approv
 `gh pr list --state open`: if the work is a hard dependency of an open PR and a separate
 branch buys nothing, commit to that branch instead.
 
-This is **hook-enforced**: a commit or push while on `main`/`master`, `gh pr merge`, and
-`git commit --amend`/`--no-verify` are all hard-blocked.
+This is **hook-enforced**: a commit or push while on `main`/`master`, `gh pr merge`,
+`git commit --amend`/`--no-verify`, a `git commit` flag not on the allowlist or with a
+pathspec (`-am`, `commit <file>`), and staging bundled with committing in the same
+command (`git add x && git commit`) are all hard-blocked. Stage, confirm what's
+staged, then commit as a separate step.
 
 If a branch falls behind `main` while under review (e.g. another PR merged first and the
 `.claude/task/*` bookkeeping now conflicts), run `/sync-branch`: it rebases onto `main`,
