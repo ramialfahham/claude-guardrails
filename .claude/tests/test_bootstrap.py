@@ -29,6 +29,7 @@ _EXPECTED = [
     ".claude/agents/scope-auditor.md",
     ".claude/agents/cto-reviewer.md",
     ".claude/commands/status.md",
+    ".claude/skills/setup-project/SKILL.md",
     ".claude/tests/test_commit_review_gate.py",
     ".claude/settings.json",
     ".claude/review_routing.json",
