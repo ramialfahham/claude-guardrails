@@ -1,81 +1,106 @@
-diff_sha256: db2459b4ae6d32ea5742245e6f3a5ebf56272005dfeac0da97a654f29a234e51
+diff_sha256: 0270ef0bae7414f33feb3e066e70ab165c3ae32b8f49b0b99c6b14096fb0a56e
 
-rounds: 9
+rounds: 4
 
 Full round-by-round history (findings, fixes, and every owner authorization
 past this repo's 3-round cap) is recorded in `.claude/task/contract.md`'s
 amendments log — this file records only the final verdicts and the verbatim
 CPO ANSWERs required for the round-cap gate.
 
-CPO ANSWER: round 7 authorization — asked directly whether to continue
-reviewing after round 6's fixes; the owner's verbatim answer was "review is
-not done yet", read plainly as "don't stop early, keep reviewing." Round 7
-was dispatched on that basis (recorded fully, including the earlier gap
-where this same authorization went unrecorded, in contract.md).
+CPO ANSWER: round 4 authorization — asked directly via AskUserQuestion
+("Round 3 (this repo's cap) is done... This is round 4 territory now.
+Continue reviewing, or stop here?", options "Dispatch round 4" / "Stop
+reviewing, commit as-is."). The owner answered "Dispatch round 4."
 
-CPO ANSWER: round 8 authorization — asked directly via AskUserQuestion
-("Round 7 found 2 more real issues... This is round 8. Continue reviewing,
-or stop here?", options "Dispatch round 8" / "Stop reviewing, commit
-as-is."). The owner answered "Dispatch round 8."
+CPO ANSWER: round 4's scope-auditor pass ESCALATEd (not FAILed) on whether
+the round-4-authorization CPO ANSWER above was genuinely verbatim, correctly
+noting the subagent has no access to the actual conversation to verify it.
+Resolved by the builder (who does have that transcript): the AskUserQuestion
+call's actual `question` field and the tool result's recorded answer match
+the entry above exactly — confirmed and recorded in contract.md's amendments
+log. No new owner input was needed; this was a verification-access
+limitation, not a disputed judgment call.
 
-CPO ANSWER: round 9 authorization — asked directly via AskUserQuestion
-("Round 8 found 1 real blocking issue... This is round 9. Continue
-reviewing, or stop here?", options "Dispatch round 9" / "Stop reviewing,
-commit as-is."). The owner answered "Dispatch round 9."
-
-Manual run (per this contract's `done_when`): the setup-project interview
-was walked by hand against a dbt-project scenario (all four stack tags off
-except dbt) and a non-dbt scenario (data-eng + frontend), reproducing the
-same module sets `.claude/tests/test_preview_project_setup.py` asserts for
-each. The plain-project (zero-tag) and unmatched-stack description paths
-were exercised as part of round 6/7's manual checks and round 8/9's fix
-verification, per the amendments log.
+Manual run (per this contract's `done_when`): the generation script was run
+end-to-end against two real scratch git repos (a dbt scenario and a
+data-eng+frontend+sensitive-data scenario), each bootstrapped via the real
+`scripts/bootstrap.sh`, reproducing the exact module sets
+`.claude/tests/test_generate_project_setup.py` asserts for each, including
+the smoke test passing (block-without-review, then allow-with-review) both
+times. Idempotent re-generation with the same answers was confirmed live in
+that same scratch run, not just in the test fixture. The force-protection
+scenario (refusing to clobber a hand-customized routing/guard-paths file
+without `--force`, succeeding with it) is covered by the automated test
+suite; a manual hand-edit-then-regenerate check hit an unrelated
+Bash/Windows path-translation artifact in the throwaway verification script
+itself (not the tool under test) and was not repeated, since the automated
+tests for this exact scenario already pass and are the authoritative check.
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Every changed file (`scripts/preview_project_setup.py`,
-  `.claude/skills/setup-project/SKILL.md`,
-  `.claude/tests/test_preview_project_setup.py`,
-  `.claude/tests/test_bootstrap.py`, `.claude/task/contract.md`,
-  `.claude/task/review.md`) falls within contract.md's declared
-  scope_paths; no file outside that list was touched.
-- Every owner-facing wording/naming choice in SKILL.md (question text,
-  option labels, headers) traces to an explicit CPO ANSWER or decision
-  recorded in contract.md's amendments log — none was chosen silently.
-  Round 9 re-confirmed the round-8 mechanism fix preserved the
-  owner-approved option labels verbatim and introduced no new owner-level
-  decision of its own (mechanism-only change).
-- `scripts/preview_project_setup.py` writes nothing to disk under any code
-  path — verified directly (single `open()` call, read-mode only) and via
-  the runtime sha256 content-hash snapshot test, which is the authoritative
-  check per this contract (the AST-based scan is documented as a best-effort
-  lint hint only, not the guarantee).
-- Every "fixed" claim in contract.md's amendments log was cross-checked
-  against the actual current file state, not taken on the log's word alone.
+- Every changed file across all 4 rounds (`scripts/generate_project_setup.py`,
+  `templates/starter-README.md.tmpl`, `.claude/skills/setup-project/SKILL.md`,
+  `.claude/tests/test_generate_project_setup.py`,
+  `.claude/tests/test_routing_doc_parity.py` — added to scope_paths as a
+  recorded round-2 amendment, `.claude/task/contract.md`,
+  `.claude/task/review.md`) falls within contract.md's declared scope_paths;
+  no file outside that list was touched.
+- Both original owner decisions hold across every round: no
+  confidential-scope-doc/summarization feature exists anywhere in the diff
+  (cut entirely per the 2026-09-08 decision, not built in any reduced
+  form); the legacy `cto-reviewer.md` is genuinely removed from a generated
+  target's `.claude/agents/` (deletes only that one known filename, never a
+  glob).
+- Every new mechanism introduced across all 4 rounds — the `_generated_by`/
+  `_generated_sha256` content-hash protection, the `--force` CLI flag, the
+  generalization of `test_routing_doc_parity.py` — traces to a recorded
+  amendment with its own rationale, none introduced silently.
+- Round 3's finding (the `--force` flag missing from `done_when`'s
+  exhaustive CLI flag list) is now fixed and verified present; round 4
+  confirmed the fix is accurate and that it's the ONLY thing that changed
+  since round 3's cto-reviewer PASS.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- Command-injection risk from the unmatched-stack free text: the CLI has no
-  `--unmatched-stack` flag (removed structurally in round 4, re-confirmed
-  intact through round 9 via `test_cli_has_no_unmatched_stack_flag` running
-  the real subprocess), and SKILL.md forbids passing that text as a command
-  argument under any answer path, including the round-8/9-added plain-text
-  follow-up.
-- Dry-run guarantee: `_repo_snapshot`'s sha256 whole-tree content hash
-  (before/after a real subprocess run of the CLI) is the authoritative
-  proof of zero writes, catching in-place overwrites a path-listing
-  comparison would miss. The script's only `open()` call is read-mode.
-- Real module wiring, not reimplementation: `build_routing_preview` and
-  `build_naming_lint_report` call the actual `compose_routing.compose()`
-  and `lint_reviewer_name.check_file()` rather than duplicating their
-  logic, so this preview cannot silently drift from the real generation
-  path.
-- The round-8 finding (SKILL.md's "Yes, something else needs a dedicated
-  reviewer" option had an unspecified free-text-collection mechanism, risking
-  a model inventing fake AskUserQuestion options) is fully closed: round 9
-  walked all three possible answers to the unmatched-stack question and
-  confirmed each has a named, unambiguous handling path, with the
-  `AskUserQuestion` route explicitly forbidden and the reason stated inline.
-- No new dependency, CI surface, hook, or permission change; stdlib only.
+- **Path safety**: every filesystem-mutating call in
+  `scripts/generate_project_setup.py` (`shutil.copyfile`, `os.remove`,
+  `os.makedirs`, `compose_routing._write_atomic`) resolves under the
+  `target` argument; the legacy-file deletion targets only the one known
+  filename `cto-reviewer.md`, never a glob.
+- **Write-ordering / "nothing written on refusal"**: `generate()` runs the
+  bootstrapped-target check, the naming-lint check, both force-protection
+  checks, and renders both templates (which can themselves raise on drift)
+  — ALL before the first `os.makedirs` call. A round-1 finding that
+  template rendering happened after some writes had already occurred is
+  fixed and re-verified this round.
+- **Content-hash integrity of the force-protection mechanism**: verified
+  the hash is computed identically on the write side (`generate()`) and the
+  verify side (`_routing_needs_force`/`_guard_paths_needs_force`) via the
+  same shared functions, over re-parsed data (not file bytes), so on-disk
+  formatting/key-order/line-ending differences can't perturb it. A
+  round-2 finding that the marker only proved authorship (not that content
+  was unchanged since generation — the exact edit `bootstrap.sh`'s own
+  instructions tell the owner to make) is fixed with real content hashing
+  and re-verified this round, including the specific "marker present, hash
+  mismatches" case a naive presence-only marker would have missed.
+- **The smoke test's required-reviewer computation**: fixed from an
+  always-only undercount (round-1 finding — would have falsely reported a
+  correctly-working gate as broken once a target committed its generated
+  `.claude/` on a feature branch) to a safe superset matching
+  `commit_review_gate._required_reviewers`'s real semantics; reproduced and
+  verified against the real cumulative-diff code path, not just the
+  no-base-ref fallback a round-1 finding showed the original test fixture
+  was accidentally exercising instead.
+- **Downstream-consumer correctness**: writing `guard-paths.md` un-skips
+  `.claude/tests/test_routing_doc_parity.py` in every generated project
+  (shipped there unconditionally by `bootstrap.sh`) — a round-2 finding
+  that this would fail in every generated project (hardcoded reviewer name,
+  backtick-format mismatch) is fixed by generalizing that test to read the
+  escalate-reviewer name from the doc itself, verified both against this
+  kit's own real dogfooded files and, end-to-end, by actually running the
+  target's own copy of that test file as a subprocess after generation and
+  requiring exit 0.
+- No new dependency, CI surface, hook wiring, or permission change across
+  any round; stdlib only throughout.

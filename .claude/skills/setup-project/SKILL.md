@@ -1,12 +1,15 @@
 ---
 name: setup-project
-description: Interview to preview which reviewer modules, routing, and guard-paths a project would get from claude-guardrails. DRY RUN ONLY — writes nothing. Phase 6a; actual generation into a target project ships as a separate, later skill.
+description: Interview to select, preview, and (with explicit confirmation) generate reviewer modules, routing, guard-paths, and a starter README for a project from claude-guardrails.
 disable-model-invocation: true
 ---
 
-**This skill performs a dry-run preview only. It never creates, copies, or
-modifies any file in any target project, no matter what is answered.** State
-this to the user before asking anything, and restate it at the end.
+**Steps 1-6 are a dry-run preview only — they never create, copy, or modify
+any file in any target project, no matter what is answered.** Real writes
+only happen from step 7 onward, and only after an explicit SECOND
+confirmation in step 9, separate from step 6's "does this reviewer set look
+right" confirmation. State this distinction to the user before asking
+anything, and restate what actually happened (or didn't) at the end.
 
 **This skill only works from a `claude-guardrails` checkout.** It calls
 `scripts/preview_project_setup.py`, which reads `templates/reviewers/` —
@@ -96,10 +99,53 @@ set up, and stop — do not attempt the interview.
      "sensitive-data" (4 options, all four of step 3's stack tags). Flip
      only that one boolean from step 3's answers, and repeat steps 4-6 with
      the updated flags.
-   - If yes: stop.
+   - If yes: continue to step 7.
 
-7. Close by restating plainly: this was a dry run, nothing was written, and
-   generating the actual files (copying reviewer modules, composing a real
-   `review_routing.json`, writing a rendered `guard-paths.md`, a starter
-   `README.md`, and the post-setup verification commit) is a separate skill
-   that doesn't exist yet.
+7. Ask the user in plain text (not a tool call): "This preview is complete.
+   Want me to actually generate these files into a project now? If so, give
+   me the path to that project's repo root." If they decline, or don't give
+   a path, stop here — restate plainly that this was a dry run and nothing
+   was written. Never assume or guess a target path.
+
+8. Check whether `<target>/.claude/settings.json` exists. If it doesn't,
+   tell the user this project isn't bootstrapped by claude-guardrails yet
+   and offer to run `scripts/bootstrap.sh <target>` — wait for their
+   go-ahead before running it, never run it silently. If bootstrapping
+   fails or they decline, stop here.
+
+9. Ask ONE more explicit `AskUserQuestion` (header "Confirm write" — a
+   separate confirmation from step 6's "does this reviewer set look right",
+   since this one is about actually WRITING, a more consequential action):
+   "Generate these files into `<target>` now? This writes real files:
+   reviewer modules into `.claude/agents/`, a composed
+   `.claude/review_routing.json`, a rendered `.claude/rules/guard-paths.md`,
+   and `README.md` if none exists yet." — options: "Yes, generate now" /
+   "No, stop here". If no: stop — the preview from steps 1-6 already showed
+   what would happen; nothing has been written.
+
+10. If yes: run, via Bash, from the repo root:
+    ```
+    python scripts/generate_project_setup.py --target "<target>" [--dbt] \
+        [--data-eng] [--frontend] [--sensitive-data] \
+        [--ci-provider github|gitlab|none]
+    ```
+    using the SAME flags step 4 already derived from the STACK/CI PROVIDER
+    answers. Never add `--force` yourself — it exists to deliberately
+    overwrite a `review_routing.json`/`guard-paths.md` that already looks
+    hand-customized, which is an owner decision the interview must never
+    make silently on their behalf. Show its stdout VERBATIM — same "the
+    script is the source of truth, never re-narrate its output" rule as
+    step 5 — but ALSO check its exit code and stderr: a nonzero exit means
+    it printed `REFUSED: ...` (generation itself refused — e.g. the target
+    looks already customized) or `REFUSED (smoke test): ...` (generation
+    succeeded but the smoke test didn't pass) on stderr. Show that line to
+    the user plainly and stop; never treat a nonzero exit as if it
+    succeeded, and never treat generation as fully verified unless the
+    command actually exited 0 with the smoke-test line printed.
+
+11. Close by restating plainly, in your own words: what was generated (the
+    module list, whether the old `cto-reviewer.md` was removed, whether
+    `README.md` was written or already existed and was left alone), and
+    whether the smoke test confirmed the review gate fires for this project
+    — or, if it was skipped or failed, say so exactly, never imply success
+    it didn't earn.
