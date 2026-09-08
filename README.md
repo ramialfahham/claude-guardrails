@@ -69,6 +69,21 @@ Safe to re-run to pull updates: the guard *code* is refreshed, while your own `s
 preview). Then commit the new `.claude/` and approve the hooks on the next Claude Code session.
 Run it with `--help` for the full usage.
 
+**Getting a tailored reviewer set, not just the two defaults.** Run the `/setup-project` skill
+from a `claude-guardrails` checkout (in Claude Code, after cloning this repo) to interview you
+on your project's stack and generate a reviewer set to match — see
+[What's in the repo](#whats-in-the-repo) below.
+
+**Pulling in later kit improvements.** Every bootstrap/re-run stamps `.claude/.kit-version`
+with the commit this checkout is on, so you can always tell which version a project was last
+updated from. To update: re-run `bootstrap.sh` (refreshes the guard code, as above). If the
+project was set up via `/setup-project`, the kit doesn't remember which stack you answered with
+— re-run `scripts/generate_project_setup.py --target /path/to/project` with the SAME stack flags
+you originally gave the interview (`--dbt`, `--data-eng`, etc.); passing the wrong ones shrinks
+the reviewer set. It refuses to touch a `review_routing.json`/`guard-paths.md` you've since
+hand-tuned unless you also pass `--force` — only pass that once you've confirmed the flags are
+right, never as a matter of course.
+
 ## Requirements
 
 The hooks are small Python scripts run through a bash shell, so the machine running Claude Code
@@ -78,12 +93,30 @@ instead of leaving you unknowingly unguarded.
 
 ## What's in the repo
 
-- **`.claude/`** — the guardrails, committed and readable: the hooks (`.claude/hooks/`), the two
-  reviewers (`.claude/agents/` — `scope-auditor`, `cto-reviewer`), the `status` command,
-  `settings.json` wiring the hooks, `working-agreement.md` (the rules the hooks and reviewers
-  reference), and `review_routing.json`. The handover lives at `.claude/active_work.md`.
-- **`scripts/bootstrap.sh`** — copies `.claude/` into an existing repo.
+- **`.claude/`** — the guardrails, committed and readable: the hooks (`.claude/hooks/`), the
+  baseline reviewers (`.claude/agents/` — `scope-auditor`, always required, and `cto-reviewer`,
+  this kit's own general platform reviewer), the `status` command, the `setup-project` interview
+  skill (`.claude/skills/setup-project/`), `settings.json` wiring the hooks,
+  `working-agreement.md` (the rules the hooks and reviewers reference), and
+  `review_routing.json`. The handover lives at `.claude/active_work.md`.
+- **`templates/reviewers/`** — a library of hand-authored, function-named reviewer modules
+  (`platform-reviewer`, `data-engineer-reviewer`, `analytics-engineer-reviewer`,
+  `frontend-reviewer`, `security-reviewer`, each tagged with which stack it applies to) plus
+  routing fragments for composing them into a project's `review_routing.json`. A generic
+  reviewer synthesized from a checklist reproduces the "one overloaded reviewer" failure this
+  design deliberately avoids — see `docs/decisions/module-library-vs-templating.md`.
+- **`scripts/`** — `bootstrap.sh` (copies `.claude/` into an existing repo); `compose_routing.py`
+  and `lint_reviewer_name.py` (merge routing fragments, reject corporate-title reviewer names);
+  `promote_reviewer.py` (graduates a proven drafted reviewer into the library); `preview_project_setup.py`
+  and `generate_project_setup.py` (the `/setup-project` interview's dry-run preview and actual
+  generation — select a reviewer set for a project's stack, compose its routing, and write it in);
+  `audit_ci_automation.py` (advisory scan for CI-side auto-merge automation no local git hook can
+  see).
 - **`task/`** — the contract + review templates the review cycle uses.
+
+Run `/setup-project` (a Claude Code skill, from a `claude-guardrails` checkout) to interview a
+project on its stack and generate a tailored reviewer set instead of the two defaults — see
+`docs/project-kit-design.md` for how the pieces above fit together.
 
 ## Design decisions
 
