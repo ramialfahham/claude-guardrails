@@ -1,142 +1,131 @@
 # Active work
 
-## `claude-project-kit` — Phase 6a merged. Phase 6b MR open (!14).
+## `claude-project-kit` — all 7 phases (+1b) merged. Plan complete.
 
-Full plan: `C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`. 7 phases +
-1b, one task contract each.
+Full plan: `C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`.
 
 **Merged**: Phase 1 (MR !2), Phase 1b (MR !3), Phase 2 (MR !4), Phase 3 (MR !6),
 Phase 4 (model-routing convention), Phase 5 (CI-provider automation audit),
-Phase 6a (setup-project dry-run interview + preview, MR !12 + handover MR !13)
-— all on `main`.
+Phase 6a (setup-project dry-run interview + preview, MR !12 + handover MR !13),
+Phase 6b (actual generation, MR !14 + handover MR !15), Phase 7 (distribution +
+portfolio docs, MR !16) — all on `main`. **No phase is open or unmerged.**
 
-**Open, unmerged**: `!14` — Phase 6b, described below.
+### Where things stand today
 
-### Phase 6b — actual generation for setup-project: MR !14 open, CI green, needs owner merge
+A project gets set up two ways:
+- **Static**: `scripts/bootstrap.sh /path/to/project` — copies the guard code
+  in. Safe to re-run (kit code refreshes, project-owned config is preserved
+  unless `--force`); now also stamps `.claude/.kit-version` with this kit's
+  own commit SHA on every run (Phase 7), so a project owner can tell what
+  version they're on.
+- **Tailored**: from a `claude-guardrails` checkout, run the `/setup-project`
+  skill — interviews the project's stack, previews a reviewer set, then (after
+  an explicit second confirmation) generates it: copies the matching reviewer
+  modules, removes the bootstrap-default `cto-reviewer.md`, composes
+  `review_routing.json`, renders `guard-paths.md`, writes a starter README,
+  and runs a smoke test proving the new gate actually fires.
 
-`scripts/generate_project_setup.py` — wires Phase 6a's dry-run preview into
-real writes. Given a bootstrapped target project and structured interview
-answers: copies selected reviewer modules into `.claude/agents/`, removes
-the bootstrap-default `cto-reviewer.md`, composes and writes a real
-`.claude/review_routing.json`, renders `.claude/rules/guard-paths.md` from
-the template, writes a starter `README.md` if none exists, and runs a
-`smoke_test()` proving the target's own generated `commit_review_gate.py`
-actually fires. `.claude/skills/setup-project/SKILL.md` extended (steps
-7-11) to drive it, gated behind an explicit second confirmation separate
-from the existing "does this reviewer set look right" step.
+`docs/project-kit-design.md` is the architecture overview now (how
+`scripts/`/`templates/`/`.claude/` fit together, the review-gate mechanics);
+`docs/decisions/*.md` are short ADRs for the real design calls made across
+every phase, each pointing at its actual source rather than re-narrating it;
+`README.md` was brought current in Phase 7 (it had drifted — still described
+only the original two reviewers with no mention of the module library or the
+interview).
 
-**Two owner decisions locked before implementation, via a plan-mode
-session** (both recorded verbatim in `.claude/task/contract.md`):
-- **No confidential-scope-doc / summarization feature.** The original
-  Phase 6 plan's idea (owner pastes project context, the kit summarizes it
-  into `CLAUDE.md` with full detail kept in a separate `.claude/rules/`
-  file) is cut ENTIRELY, not deferred. Owner's reasoning: an automated
-  setup step that invites pasting client names, internal system names, or
-  business rules into a new repo is a bad default regardless of where the
-  text ends up. Neither sibling repo (`dbt-agent-kit`, `football-data-pipeline`)
-  had this pattern to build from either — verified directly before the
-  decision was made. **Don't resurrect this without a fresh, explicit
-  owner conversation** — it was cut on purpose, not skipped for time.
-- **The legacy `cto-reviewer.md` is removed from generated projects.**
-  `bootstrap.sh` ships it into every project unconditionally regardless of
-  stack — the exact "one overloaded generic reviewer" problem the whole
-  module-library effort exists to fix. `platform-reviewer` (always
-  selected, since it's `applies_when: [always]`) is its direct successor.
-  Generation deletes only that one known filename, never a glob.
+### Phase 7 — what to know before touching `scripts/bootstrap.sh`'s version-stamp block again
 
-**This phase went through 4 review rounds — know this before touching the
-file again.** Full blow-by-blow is in `.claude/task/contract.md`'s
-amendments log; the headline pattern worth knowing without reading all of
-it:
+Went through 3 review rounds, and the version-stamp logic (a small addition —
+stamp `.claude/.kit-version` with `git -C "$KIT_ROOT" rev-parse HEAD`) turned
+into real iteration, not polish, because of environment-specific path-format
+bugs caught LIVE (by manual scratch-repo verification, not just by review
+prose) on this exact dev box:
 
-- **The smoke test cannot be "make a real commit and see if it's
-  blocked."** `commit_review_gate.py`'s enforcement is a Claude-Code-
-  session-level `PreToolUse(Bash)` hook, not a git hook — it only
-  intercepts Bash TOOL calls made by a live agent session in its OWN
-  project directory, never a plain `subprocess.run(["git","commit"])` from
-  arbitrary code, and never a different directory a command happens to
-  `cd`/`-C` into. (This was independently rediscovered and confirmed live
-  mid-session: a literal `git -C <scratch-target> commit` run via the Bash
-  tool got blocked by THIS repo's own gate, unrelated to the target,
-  because this session's own diff was staged and unreviewed at the time —
-  a real demonstration of the same mechanism.) The smoke test instead runs
-  the target's own copied `commit_review_gate.py` as a real subprocess with
-  a simulated PreToolUse JSON event on stdin — the same technique
-  `test_commit_review_gate.py`'s own `_run_main_in` helper already uses.
-  No commit is ever made.
-- **Round 1** fixed 6 issues in the first draft, the two worth remembering:
-  the smoke test's required-reviewer computation was `always`-only, but the
-  real gate unions `always` with every reviewer whose `paths` pattern
-  matches the CUMULATIVE branch diff — once a target commits its generated
-  `.claude/` on a feature branch (bootstrap.sh's own instructed next step),
-  that diff includes `.claude/hooks/*`/`.claude/agents/*`, making
-  `platform-reviewer` required; an under-computed review.md made a
-  correctly-working gate report as broken. Fixed with a safe superset
-  instead of reimplementing the gate's matching logic. Also:
-  `GenerationRefused`'s "nothing written" guarantee was violated because
-  template rendering happened AFTER some writes — fixed by moving all
-  validation and rendering before the first mutation.
-- **Round 2** found that writing `guard-paths.md` un-skips
-  `.claude/tests/test_routing_doc_parity.py` (shipped into every target by
-  `bootstrap.sh`), which then failed in every generated project — it was
-  hardcoded to look for `"cto-reviewer"` and compared raw list-item text
-  against backtick-wrapped output. Fixed by generalizing that test to read
-  the escalate-reviewer name from the doc's own "Convention" paragraph
-  instead of hardcoding it (added to this contract's `scope_paths` as a
-  recorded amendment — it's a SHARED file, also this kit's own dogfooded
-  parity check). Also found the original `_generated_by` marker (added to
-  protect hand-customized `review_routing.json`/`guard-paths.md` from being
-  silently overwritten on a later re-run) only proved AUTHORSHIP, not that
-  content was unchanged since — exactly the edit `bootstrap.sh`'s own
-  closing instructions tell the owner to make would have been silently
-  discarded. Fixed with real content-hash verification
-  (`_generated_sha256` for routing.json, an embedded hash in
-  guard-paths.md's marker comment) plus a `--force` CLI flag mirroring
-  `bootstrap.sh`'s own `keep_file`/`--force` convention.
-- **Round 3** (this repo's cap) found the new `--force` flag itself wasn't
-  listed in the contract's own exhaustive CLI-flag documentation — the same
-  standard applied to a since-removed `--skip-smoke-test` flag in round 1.
-  Purely a docs-sync gap, fixed in one line.
-- **Round 4** required fresh owner sign-off (recorded verbatim in
-  contract.md) since it's past the cap. cto-reviewer correctly recognized
-  nothing code-level had changed since its round-3 PASS and scoped its
-  effort accordingly rather than re-running a full audit for no reason —
-  worth remembering as the right instinct for a documentation-only round.
-  scope-auditor ESCALATEd (not FAILed) only on whether the round-4
-  authorization's CPO ANSWER was genuinely verbatim, correctly noting it
-  has no access to the actual conversation to check — resolved directly by
-  the builder, who does have that transcript. **Lesson**: a reviewer
-  ESCALATEing on its own verification limits (as opposed to a substantive
-  finding) doesn't need a fresh owner decision — it needs the builder to
-  supply the information the subagent structurally can't reach.
+1. A bare `rev-parse HEAD` (no `--verify`) echoes the literal string `HEAD`
+   to stdout on an unborn-HEAD repo before failing on stderr —
+   `2>/dev/null` doesn't catch that. Fixed with `--verify`.
+2. `git -C "$KIT_ROOT"` walks UP to find an enclosing repo, so a non-git
+   `KIT_ROOT` sitting inside an unrelated repo would stamp THAT repo's SHA.
+   First fix: compare `rev-parse --show-toplevel`'s output against
+   `$KIT_ROOT` as path text.
+3. That comparison broke the NORMAL case on this exact box: git printed
+   `D:/Projects/claude-guardrails` (drive-letter form) while `$KIT_ROOT`
+   (via `pwd -P`) is `/d/Projects/claude-guardrails` (MSYS form) — same
+   real directory, different string. Fixed by normalizing both sides
+   through the same `abspath()` function.
+4. That normalization ALSO broke, because Git Bash mount-aliases `%TEMP%`
+   (`AppData\Local\Temp`) to `/tmp` — re-running `abspath()` on an
+   already-canonical path isn't even idempotent there.
+5. **Final fix**: stopped comparing path TEXT entirely. `[ -e
+   "$KIT_ROOT/.git" ]` — a plain filesystem existence check — closes the
+   whole bug class structurally instead of patching around it further.
+   Correctly matches a worktree too (its `.git` is a file, not a
+   directory — `-e` matches either).
 
-**Next**: get `!14` merged, then decide on Phase 7 (distribution + portfolio
-docs — `bootstrap.sh` gains a `templates/` sync + update mechanism reusing
-`dbt-agent-kit`'s `sync-base.sh`/`.base-version` pattern, plus `README.md`,
-`docs/project-kit-design.md`, short `docs/decisions/*.md` ADRs) — not yet
-contracted.
+**Lesson for next time a path needs comparing in a bash script that might
+run under Git Bash on Windows**: don't compare path TEXT across tools (bash's
+own `pwd -P` and git's own path-printing commands can format the SAME real
+directory differently, and "normalize then compare" isn't reliably fixable
+because normalization itself isn't always idempotent across a mount-aliased
+tree like `%TEMP%`/`/tmp`). Prefer a existence/identity check that never
+needs the two sides to agree on a string.
 
-**Owner decisions still open**: rename this repo to `claude-project-kit`
-(deferred); rename `.claude/agents/cto-reviewer.md` itself (deferred, though
-note it's now ALSO the name generation actively removes from every new
-project — the rename question is entirely about this kit's own
-self-governance file at this point, not about downstream projects anymore);
-whether/how to wire `templates/ci-audit/ci_automation_audit.py` as an actual
-`SessionStart` hook in any project (still inert everywhere, by design);
-whether `templates/*` should be its own guard path in
-`review_routing.json`/`guard-paths.md` (flagged at the end of Phase 5, still
-not decided); the pre-existing drift between THIS kit's own hand-maintained
-`.claude/rules/guard-paths.md` and `templates/reviewers/routing/
-platform-reviewer.routing.json` (flagged during Phase 6a, still unresolved
-in this kit's own copy — Phase 6b's generation logic avoids introducing this
-SAME class of drift into new projects by deriving guard-paths.md fresh from
-the composed routing every time, but doesn't fix the kit's own existing copy).
+A second, separate finding from the same phase: `.claude/tests/test_bootstrap.py`'s
+first version of the version-stamp tests was **tautological** —
+`if os.path.isfile(stamp): assert ...` gates the check on the very file the
+check exists to verify, so a regression that silently stopped the stamp from
+being written would make the test SKIP, not FAIL, and CI treats a skip as
+green. Fixed with `_kit_owed_a_stamp()`, which determines independently
+(mirroring `bootstrap.sh`'s own gates, not the stamp file's existence)
+whether one should exist, then hard-asserts when it should.
 
-**Minor cleanup still NOT done** (deferred across several sessions now,
-already caused one real rebase-blocking incident): `.claude/hooks/__pycache__/*.pyc`
-tracked in git from before `.gitignore` existed — `git rm -r --cached
-.claude/hooks/__pycache__` as its own tiny standalone commit. Just do it next
-time.
+Three narrow items were flagged in round 3's review and deliberately left
+unfixed (recorded in `.claude/task/contract.md`'s amendments, not silently
+dropped): a corrupted (not merely absent) `.git` nested in an unrelated repo
+could still mis-stamp; the skip message doesn't distinguish "unborn HEAD"
+from "git unavailable" from "ownership refusal"; two doc sentences say
+"every run" without the "when git history is available" qualifier. None
+worth a further round — see the amendments log for the reviewer's own
+reasoning on each.
+
+**Owner decision locked this phase**: a minimal version stamp, not a port of
+`dbt-agent-kit`'s full `sync-base.sh`/coverage-guard/CI-drift-check
+machinery — that machinery exists to preserve a *derivative* kit's own local
+overlay (routing/working-agreement additions), which a plain project
+generated by this kit's own tooling doesn't have. Updating a plain project is
+just re-running `bootstrap.sh` + `generate_project_setup.py` with the same
+interview flags (the kit doesn't persist which flags were originally used —
+documented honestly as a known limitation in the README/ADR, not silently
+glossed over). If derivative kits become a repeated pattern, a real sync
+mechanism earns its complexity then, not preemptively.
+
+### Owner decisions still open (none blocking, none scheduled)
+
+- Rename this repo to `claude-project-kit` (deferred since Phase 1's
+  planning — `dbt-agent-kit/scripts/sync-base.sh` hardcodes this repo's
+  GitHub URL as its sync source, so a rename needs that fixed in the same
+  pass).
+- Rename `.claude/agents/cto-reviewer.md` itself (deferred; note it's now
+  ALSO the file generation actively removes from every new project, so this
+  is entirely about this kit's own self-governance file at this point).
+- Whether/how to wire `templates/ci-audit/ci_automation_audit.py` as an
+  actual `SessionStart` hook anywhere (still inert everywhere, by design).
+- Whether `templates/*` should be its own guard path in
+  `review_routing.json`/`guard-paths.md` (flagged at the end of Phase 5,
+  still not decided).
+- The pre-existing drift between THIS kit's own hand-maintained
+  `.claude/rules/guard-paths.md` and
+  `templates/reviewers/routing/platform-reviewer.routing.json` (flagged
+  during Phase 6a; Phase 6b's generation logic avoids introducing this same
+  drift into NEW projects by deriving `guard-paths.md` fresh from the
+  composed routing every time, but doesn't fix the kit's own existing copy).
+
+### Minor cleanup still NOT done (deferred across many sessions now)
+
+`.claude/hooks/__pycache__/*.pyc` tracked in git from before `.gitignore`
+existed — `git rm -r --cached .claude/hooks/__pycache__` as its own tiny
+standalone commit. Already caused one real rebase-blocking incident. Just do
+it next time someone's touching hooks anyway.
 
 ## Earlier, unrelated to the above
 
