@@ -12,7 +12,8 @@
 # Run it from a checkout of claude-guardrails; TARGET_REPO is the repo to guard.
 #
 # Safe to re-run. Kit CODE (hooks/agents/commands/skills/tests + task templates)
-# is refreshed every run. Project-OWNED config (settings.json, review_routing.json,
+# is refreshed every run, and .claude/.kit-version is stamped with this checkout's
+# commit SHA each time. Project-OWNED config (settings.json, review_routing.json,
 # working-agreement.md, active_work.md) is preserved if it already exists — pass
 # --force to overwrite it with the kit's version.
 #
@@ -108,6 +109,50 @@ refresh_dir ".claude/skills"
 refresh_dir ".claude/tests"
 refresh_file "task/CONTRACT_TEMPLATE.md"
 refresh_file "task/REVIEW_TEMPLATE.md"
+
+# Kit version stamp — lets a project owner tell which kit commit they last
+# refreshed from. A fact about the kit, not project-owned config: always
+# overwritten, never keep_file semantics. Skips quietly (not a hard failure)
+# if the kit checkout has no git history to read from — e.g. a zip-extracted
+# copy with no .git, or a repo with an unborn HEAD (no commits yet).
+if [ "$DRY" -eq 1 ]; then
+  echo "DRY   write .claude/.kit-version"
+else
+  kit_sha=""
+  skip_reason="kit checkout has no git history"
+  # Deliberately a plain existence check on "$KIT_ROOT/.git", NOT a
+  # `rev-parse --show-toplevel` path comparison — an earlier version of
+  # this block compared git's toplevel output against $KIT_ROOT as strings,
+  # which broke twice on real path-format mismatches on this exact dev
+  # setup: once from a drive-letter ("D:/...") vs MSYS ("/d/...") form
+  # difference, and then AGAIN once that was normalised through abspath(),
+  # because Git Bash treats %TEMP% (AppData\Local\Temp) as mount-aliased to
+  # /tmp — so re-running abspath() on an already-canonical path can still
+  # change its string form depending on which literal prefix it started
+  # from. Comparing absolute path TEXT is fundamentally fragile here. A
+  # plain "does $KIT_ROOT/.git exist" sidesteps all of it: git -C walking
+  # up to find an ENCLOSING repo is exactly what made the old check
+  # necessary in the first place, and this check never invokes git at all
+  # for the ownership question, so there's nothing for it to walk up from.
+  # Correctly recognises a worktree too — its ".git" is a FILE (a "gitdir:"
+  # pointer), not a directory, and -e matches either.
+  if [ -e "$KIT_ROOT/.git" ]; then
+    # --verify (not a bare `rev-parse HEAD`): on an unborn HEAD (a repo with
+    # zero commits), a bare rev-parse echoes the literal argument "HEAD" to
+    # stdout before failing on stderr — the 2>/dev/null wouldn't catch that,
+    # and "HEAD" is not a valid SHA. --verify fails cleanly instead, with
+    # nothing on stdout.
+    kit_sha="$(git -C "$KIT_ROOT" rev-parse --verify HEAD 2>/dev/null || true)"
+    [ -z "$kit_sha" ] && skip_reason="kit checkout has an unborn HEAD (no commits yet)"
+  fi
+  if [ -n "$kit_sha" ]; then
+    mkdir -p "$TARGET_ABS/.claude"
+    printf '%s\n' "$kit_sha" > "$TARGET_ABS/.claude/.kit-version"
+    echo "sync   .claude/.kit-version"
+  else
+    echo "skip   .claude/.kit-version ($skip_reason)"
+  fi
+fi
 
 # Drop any __pycache__ the copy may have carried along.
 if [ "$DRY" -eq 0 ] && [ -d "$TARGET_ABS/.claude" ]; then

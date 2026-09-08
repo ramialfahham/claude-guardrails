@@ -1,106 +1,94 @@
-diff_sha256: 0270ef0bae7414f33feb3e066e70ab165c3ae32b8f49b0b99c6b14096fb0a56e
+diff_sha256: 96345bbcc90670119bff4756403936740c844a086e9741df2544c3c6bb74824d
 
-rounds: 4
+rounds: 3
 
-Full round-by-round history (findings, fixes, and every owner authorization
-past this repo's 3-round cap) is recorded in `.claude/task/contract.md`'s
-amendments log — this file records only the final verdicts and the verbatim
-CPO ANSWERs required for the round-cap gate.
+Full round-by-round history (findings, fixes, and the two plan-revision
+decisions made during planning) is recorded in `.claude/task/contract.md`'s
+amendments log — this file records only the final verdicts and risks_checked.
+No `CPO ANSWER:` needed — this phase stayed within the 3-round cap.
 
-CPO ANSWER: round 4 authorization — asked directly via AskUserQuestion
-("Round 3 (this repo's cap) is done... This is round 4 territory now.
-Continue reviewing, or stop here?", options "Dispatch round 4" / "Stop
-reviewing, commit as-is."). The owner answered "Dispatch round 4."
-
-CPO ANSWER: round 4's scope-auditor pass ESCALATEd (not FAILed) on whether
-the round-4-authorization CPO ANSWER above was genuinely verbatim, correctly
-noting the subagent has no access to the actual conversation to verify it.
-Resolved by the builder (who does have that transcript): the AskUserQuestion
-call's actual `question` field and the tool result's recorded answer match
-the entry above exactly — confirmed and recorded in contract.md's amendments
-log. No new owner input was needed; this was a verification-access
-limitation, not a disputed judgment call.
-
-Manual run (per this contract's `done_when`): the generation script was run
-end-to-end against two real scratch git repos (a dbt scenario and a
-data-eng+frontend+sensitive-data scenario), each bootstrapped via the real
-`scripts/bootstrap.sh`, reproducing the exact module sets
-`.claude/tests/test_generate_project_setup.py` asserts for each, including
-the smoke test passing (block-without-review, then allow-with-review) both
-times. Idempotent re-generation with the same answers was confirmed live in
-that same scratch run, not just in the test fixture. The force-protection
-scenario (refusing to clobber a hand-customized routing/guard-paths file
-without `--force`, succeeding with it) is covered by the automated test
-suite; a manual hand-edit-then-regenerate check hit an unrelated
-Bash/Windows path-translation artifact in the throwaway verification script
-itself (not the tool under test) and was not repeated, since the automated
-tests for this exact scenario already pass and are the authoritative check.
+Manual verification (per this contract's `done_when`): the version-stamp
+logic was checked live against real scratch git repos for every relevant
+checkout shape, not just the unit-test fixtures — a normal checkout (stamps,
+matches `git rev-parse HEAD`), an unborn-HEAD repo (skips, correctly labeled),
+and a non-git directory nested inside an unrelated enclosing repo (skips,
+correctly labeled) — including specifically re-running the unborn-HEAD case
+under this dev box's own `%TEMP%` directory, the exact environment that
+exposed a real Git-Bash mount-alias bug during round 2 (documented in the
+amendments log). `--dry-run` was confirmed to never write the stamp.
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Every changed file across all 4 rounds (`scripts/generate_project_setup.py`,
-  `templates/starter-README.md.tmpl`, `.claude/skills/setup-project/SKILL.md`,
-  `.claude/tests/test_generate_project_setup.py`,
-  `.claude/tests/test_routing_doc_parity.py` — added to scope_paths as a
-  recorded round-2 amendment, `.claude/task/contract.md`,
-  `.claude/task/review.md`) falls within contract.md's declared scope_paths;
-  no file outside that list was touched.
-- Both original owner decisions hold across every round: no
-  confidential-scope-doc/summarization feature exists anywhere in the diff
-  (cut entirely per the 2026-09-08 decision, not built in any reduced
-  form); the legacy `cto-reviewer.md` is genuinely removed from a generated
-  target's `.claude/agents/` (deletes only that one known filename, never a
-  glob).
-- Every new mechanism introduced across all 4 rounds — the `_generated_by`/
-  `_generated_sha256` content-hash protection, the `--force` CLI flag, the
-  generalization of `test_routing_doc_parity.py` — traces to a recorded
-  amendment with its own rationale, none introduced silently.
-- Round 3's finding (the `--force` flag missing from `done_when`'s
-  exhaustive CLI flag list) is now fixed and verified present; round 4
-  confirmed the fix is accurate and that it's the ONLY thing that changed
-  since round 3's cto-reviewer PASS.
+- Every changed file (`scripts/bootstrap.sh`, `.claude/tests/test_bootstrap.py`,
+  `README.md`, `docs/project-kit-design.md`, the 5 named
+  `docs/decisions/*.md` files, `.claude/task/contract.md`,
+  `.claude/task/review.md`) falls within contract.md's declared
+  scope_paths; no file outside that list was touched across any round.
+- Both plan-revision decisions made during planning (a minimal version
+  stamp instead of porting `dbt-agent-kit`'s full `sync-base.sh` mechanism;
+  no `refresh_dir "templates"`) are recorded with real technical
+  reasoning in `decisions_reserved`, not asserted without justification,
+  and held unchanged through all 3 rounds of fixes.
+- The honest-limitation disclosure added in round 1 (`generate_project_setup.py`
+  doesn't persist which stack flags a project was generated with, so
+  re-running it later requires the owner to remember and re-supply them) is
+  present and mutually consistent across `README.md`,
+  `docs/project-kit-design.md`, and
+  `docs/decisions/minimal-version-stamp-vs-sync-mechanism.md` — re-verified
+  at every subsequent round, never softened or silently removed.
+- The 5 ADRs in `docs/decisions/` accurately represent decisions already
+  made in earlier, merged phases (cross-checked against
+  `.claude/rules/guard-paths.md`'s own text and
+  `scripts/audit_ci_automation.py`'s docstring for two of them) rather than
+  being embellished after the fact; the one inaccurate claim found in
+  review (an unmatched stack automatically drafting from
+  `templates/reviewers/_skeleton.md`, which no code path actually does) was
+  corrected in round 1.
+- No new owner-level decision was introduced silently by any round's
+  fixes, including the round-2 replacement of the entire path-comparison
+  approach with a plain filesystem existence check — a technical
+  correctness fix, not a product/scope decision.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- **Path safety**: every filesystem-mutating call in
-  `scripts/generate_project_setup.py` (`shutil.copyfile`, `os.remove`,
-  `os.makedirs`, `compose_routing._write_atomic`) resolves under the
-  `target` argument; the legacy-file deletion targets only the one known
-  filename `cto-reviewer.md`, never a glob.
-- **Write-ordering / "nothing written on refusal"**: `generate()` runs the
-  bootstrapped-target check, the naming-lint check, both force-protection
-  checks, and renders both templates (which can themselves raise on drift)
-  — ALL before the first `os.makedirs` call. A round-1 finding that
-  template rendering happened after some writes had already occurred is
-  fixed and re-verified this round.
-- **Content-hash integrity of the force-protection mechanism**: verified
-  the hash is computed identically on the write side (`generate()`) and the
-  verify side (`_routing_needs_force`/`_guard_paths_needs_force`) via the
-  same shared functions, over re-parsed data (not file bytes), so on-disk
-  formatting/key-order/line-ending differences can't perturb it. A
-  round-2 finding that the marker only proved authorship (not that content
-  was unchanged since generation — the exact edit `bootstrap.sh`'s own
-  instructions tell the owner to make) is fixed with real content hashing
-  and re-verified this round, including the specific "marker present, hash
-  mismatches" case a naive presence-only marker would have missed.
-- **The smoke test's required-reviewer computation**: fixed from an
-  always-only undercount (round-1 finding — would have falsely reported a
-  correctly-working gate as broken once a target committed its generated
-  `.claude/` on a feature branch) to a safe superset matching
-  `commit_review_gate._required_reviewers`'s real semantics; reproduced and
-  verified against the real cumulative-diff code path, not just the
-  no-base-ref fallback a round-1 finding showed the original test fixture
-  was accidentally exercising instead.
-- **Downstream-consumer correctness**: writing `guard-paths.md` un-skips
-  `.claude/tests/test_routing_doc_parity.py` in every generated project
-  (shipped there unconditionally by `bootstrap.sh`) — a round-2 finding
-  that this would fail in every generated project (hardcoded reviewer name,
-  backtick-format mismatch) is fixed by generalizing that test to read the
-  escalate-reviewer name from the doc itself, verified both against this
-  kit's own real dogfooded files and, end-to-end, by actually running the
-  target's own copy of that test file as a subprocess after generation and
-  requiring exit 0.
-- No new dependency, CI surface, hook wiring, or permission change across
-  any round; stdlib only throughout.
+- **Version-stamp correctness across every checkout shape**: normal
+  checkout (stamps, matches HEAD), worktree (`.git` is a file, not a
+  directory — both the bash `-e` test and the test suite's
+  `os.path.exists` correctly match either), a non-git directory nested
+  inside an unrelated enclosing repo (skips — git is never invoked for the
+  ownership question at all, so there's nothing for it to walk up from),
+  and a corrupted/unborn checkout (skips cleanly, no crash under
+  `set -euo pipefail`).
+- **The path-comparison approach was replaced entirely, not patched
+  further**, after it broke twice on this exact dev environment in earlier
+  rounds (a drive-letter vs. MSYS path-format difference, then a
+  Git-Bash mount-alias between `%TEMP%` and `/tmp` that made even a
+  "normalized" path's string form unstable). The replacement — a plain
+  `[ -e "$KIT_ROOT/.git" ]` existence check — has no path-text comparison
+  anywhere, structurally eliminating the whole class of format/mount-alias
+  mismatch rather than incrementally patching around it.
+- **Test/script parity**: `.claude/tests/test_bootstrap.py`'s
+  `_kit_owed_a_stamp()` mirrors `scripts/bootstrap.sh`'s own gates exactly
+  (git usable → `.git` exists → `rev-parse --verify HEAD` non-empty, in the
+  same order), computed independently of whether the stamp file itself
+  exists — closing the round-2 finding that the original tests were
+  tautological (gated on the very artifact they existed to verify, which
+  would have let the round-1-fix-3 regression ship as a silent CI-green
+  skip rather than a failure).
+- **`set -e` safety**: the new `[ -z "$kit_sha" ] && skip_reason=...` line
+  is exempt from `errexit` (left operand of a `&&` list) — confirmed
+  against an identical pre-existing idiom elsewhere in the same file that
+  the suite already exercises on every run.
+- No new dependency, service, hook, CI step, or permission change across
+  any round; stdlib/`git` only, matching this repo's zero-dependency
+  policy.
+- Three narrow, explicitly non-blocking observations were raised at round
+  3 and recorded (not fixed) in `.claude/task/contract.md`'s amendments
+  log rather than opening a further round: a corrupted (not merely absent)
+  `.git` nested in an unrelated repo could still mis-stamp; the skip
+  message doesn't distinguish "unborn HEAD" from "git unavailable" from
+  "ownership refusal"; two doc sentences say "every run" without the
+  "when git history is available" qualifier the script's own visible skip
+  line already covers in practice.
