@@ -1,5 +1,105 @@
 # Active work
 
+## Post-plan hardening — Phase 1 done, MR !18 open (not yet merged)
+
+Separate initiative from the 7-phase plan below (that one really is complete).
+Triggered by the owner directly asking whether this kit reflects Anthropic's
+actual published Claude Code guidance — it never had been checked. Research
+(fetched and read Anthropic's official docs directly, not from memory) found
+3 real gaps; Phase 1 closes them:
+
+1. No completion-time reminder existed — this kit only enforced at commit
+   time. **Shipped**: `.claude/hooks/completion_gate.py`, a `PreToolUse(Bash)`
+   hook, self-gated to `git status`/`commit`/`push`, that reuses
+   `commit_review_gate._gate()` directly and injects an advisory
+   `additionalContext` note when real work is staged and unreviewed. Never
+   blocks, never sets `permissionDecision` — advisory only, an explicit owner
+   decision made via `AskUserQuestion` during planning.
+2. Auto-mode compatibility of the existing hooks was never checked or
+   documented. **Shipped**: `docs/decisions/auto-mode-and-bypass-compatibility.md`
+   — verified against Anthropic's own docs (direct quotes, not assumed) that
+   `commit_review_gate.py`'s and `branch_discipline.py`'s `deny` decisions
+   survive auto mode's classifier; `bypassPermissions` is explicitly flagged
+   as inferred, not confirmed.
+3. No documented reason for building a custom review gate instead of Claude
+   Code's built-in `/code-review`. **Shipped**:
+   `docs/decisions/custom-review-gate-vs-code-review-skill.md`.
+
+**MR**: !18, `feat/stop-hook-completion-gate` → `main`. Not merged yet — this
+handover assumes it lands as-is; if it doesn't, re-read the MR before trusting
+anything below about `completion_gate.py`.
+
+### The one thing worth reading in full before touching `completion_gate.py` again
+
+This went through **12 review rounds** (this repo's cap is 3; every round past
+it was individually owner-authorized, recorded in the now-merged branch's
+`.claude/task/contract.md` amendments log — read that file's git history on
+the MR if you need the full account). Not repeat nitpicking — genuine
+discoveries, in order:
+
+- **Round 5**: the original design used the `Stop` event. Live, mid-review,
+  that hook started forcing this very review session to auto-continue
+  repeatedly with no real user input in between. Anthropic's docs confirm why:
+  `additionalContext` on `Stop` "keeps the conversation going through the same
+  loop protections as `decision: "block"`" — it is NOT advisory on that event,
+  contrary to what an earlier (also-live) doc fetch had suggested. **Lesson**:
+  a platform-behavior claim needs a fresh, clean-quote citation checked
+  against the *specific* mechanism being relied on (here: does this field
+  block, not just "is this field supported") — not just "the field exists."
+  Redesigned onto `PreToolUse`, whose `additionalContext` genuinely has no
+  such loop.
+- **Round 6**: the `PreToolUse` redesign used no matcher ("fires on every tool
+  call"). Two real problems: it could inject the hook's note into this repo's
+  own BLINDED reviewer subagents' context mid-review (they never see anything
+  but the diff, by design), and the cost claim ("same as existing hooks
+  already pay") was wrong. Fixed: matcher scoped to `Bash`, explicit skip on
+  the event's `agent_id` field (present only for subagent-issued calls).
+- **Round 7**: the cost fix built for round 6 (a fingerprint cache gating
+  `_gate()`'s own expensive check) was itself unsound — two reviewers
+  independently found it silently missed real state changes
+  (`review_routing.json` edits, the base branch moving) that would leave a
+  stale, wrongly-suppressed answer for the rest of a session. Investigating a
+  CORRECT fingerprint found it would cost essentially the same as just calling
+  `_gate()` — the expensive part (base-ref/merge-base resolution) is exactly
+  what a correct fingerprint would also need to recompute. **Owner call,
+  verbatim: "You are definitely drifting."** — correctly naming that 7 rounds
+  and an ever-more-elaborate cache for a purely advisory nudge was
+  disproportionate. Cache dropped entirely.
+- **Round 8**: the revert still ran `_gate()` unconditionally on every Bash
+  call (no self-gate on the command), unlike every sibling hook in the same
+  matcher group. scope-auditor `ESCALATE`d rather than deciding — the cost
+  cadence had never actually been re-priced with the owner. Fixed with a
+  plain command filter (`git status`/`commit`/`push` only) reusing
+  `_command_utils.git_subcommand`/`simple_commands` — a filter, not a cache.
+- **Rounds 9-12**: mostly text-accuracy corrections (a cost claim that
+  understated the real cadence; stale `Stop`-event language left over in
+  `.claude/task/contract.md` from before the round-5 redesign, TWICE — once
+  in round 6's supposedly-complete rewrite, once again in round 11). Several
+  of these were fixed directly without dispatching another full round once it
+  became clear the underlying CODE had already passed 2+ consecutive rounds
+  unchanged — spinning up fresh opus reviewer pairs for one-sentence prose
+  fixes on already-verified code stopped being proportionate. The owner
+  explicitly asked "why are we in round 10" at one point, which was the right
+  question and shaped how the last few rounds were run.
+
+**Lesson for next time a hook design leans on a specific platform mechanism**
+(a decision field, an event's exact semantics, a "this doesn't block" claim):
+verify the SPECIFIC mechanism being relied on with a fresh, clean citation —
+not just that the general feature is documented — and expect to discover the
+real behavior only by watching the hook actually run, not just by reading
+docs once. And when a review process is finding real bugs but the CUMULATIVE
+effort clearly exceeds what the feature warrants, that's worth naming
+out loud rather than continuing to spin the loop because each individual
+round was locally justified.
+
+### Later phases of this hardening initiative (not yet contracted)
+
+Deferred, not dropped — flagged in the original research as real gaps, lower
+priority than the 3 above: sandboxing adoption (`/sandbox`), parallel-session/
+worktree safety audit, headless-mode (`claude -p`) compatibility audit. Each
+gets its own phase contract when picked up, or an explicit "considered, not
+building yet" ADR if it turns out not worth it.
+
 ## `claude-project-kit` — all 7 phases (+1b) merged. Plan complete.
 
 Full plan: `C:\Users\Rami\.claude\plans\happy-stargazing-mccarthy.md`.
