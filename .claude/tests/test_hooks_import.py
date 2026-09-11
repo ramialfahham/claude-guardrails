@@ -19,6 +19,7 @@ _HOOK_MODULES = [
     "_command_utils",
     "branch_discipline",
     "commit_review_gate",
+    "completion_gate",
     "handover_in",
     "handover_out",
     "handover_plan_gate",
@@ -32,6 +33,37 @@ def test_every_hook_module_imports():
     for name in _HOOK_MODULES:
         mod = importlib.import_module(name)
         assert mod is not None
+
+
+# docs/decisions/auto-mode-and-bypass-compatibility.md claims
+# commit_review_gate.py's and branch_discipline.py's DENY decisions survive
+# auto mode's classifier — a guarantee Anthropic's own docs make about
+# PreToolUse hooks generally, not about anything specific to this repo's
+# code. This test is a TRIPWIRE, not the reason that guarantee holds: it
+# doesn't prove the ADR's claim (Claude Code's own evaluation order does),
+# it only catches the specific, easy-to-miss way this repo could
+# accidentally invalidate the ADR's *scope* — if one of these hooks starts
+# reading permission_mode and branching on it, its deny/allow could stop
+# being purely a function of repo/diff state, and the ADR would need a
+# fresh read against the current docs before anyone trusts it again.
+# completion_gate.py is included too even though it never denies anything
+# (so the auto-mode-deny question doesn't apply to it) — this is a plain
+# hygiene check for it, not evidence for any guarantee.
+_MODE_INDEPENDENT_HOOKS = ["commit_review_gate", "branch_discipline", "completion_gate"]
+
+
+def test_gate_hooks_never_branch_on_permission_mode():
+    hooks_dir = _HOOKS
+    for name in _MODE_INDEPENDENT_HOOKS:
+        path = os.path.join(hooks_dir, f"{name}.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        assert "permission_mode" not in source, (
+            f"{name}.py references permission_mode — this contradicts "
+            "docs/decisions/auto-mode-and-bypass-compatibility.md's claim "
+            "that this kit's hooks are unaffected by permission mode; "
+            "re-verify that ADR against Anthropic's current docs before "
+            "loosening this test")
 
 
 if __name__ == "__main__":
