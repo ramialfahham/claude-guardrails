@@ -52,6 +52,12 @@
             "shell": "bash",
             "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/handover_out.py\"",
             "statusMessage": "Handover write-out reminder..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/completion_gate.py\"",
+            "statusMessage": "Checking for unreviewed staged changes..."
           }
         ]
       },

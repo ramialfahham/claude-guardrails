@@ -1,94 +1,71 @@
-diff_sha256: 96345bbcc90670119bff4756403936740c844a086e9741df2544c3c6bb74824d
+# Review
 
-rounds: 3
+diff_sha256: e0a879e994941c4b8fab36324be49b351f5dcbe0b615259a0cb631aa09a18e84
 
-Full round-by-round history (findings, fixes, and the two plan-revision
-decisions made during planning) is recorded in `.claude/task/contract.md`'s
-amendments log — this file records only the final verdicts and risks_checked.
-No `CPO ANSWER:` needed — this phase stayed within the 3-round cap.
+rounds: 12
 
-Manual verification (per this contract's `done_when`): the version-stamp
-logic was checked live against real scratch git repos for every relevant
-checkout shape, not just the unit-test fixtures — a normal checkout (stamps,
-matches `git rev-parse HEAD`), an unborn-HEAD repo (skips, correctly labeled),
-and a non-git directory nested inside an unrelated enclosing repo (skips,
-correctly labeled) — including specifically re-running the unborn-HEAD case
-under this dev box's own `%TEMP%` directory, the exact environment that
-exposed a real Git-Bash mount-alias bug during round 2 (documented in the
-amendments log). `--dry-run` was confirmed to never write the stamp.
+CPO ANSWER: 12 review rounds, far past this repo's 3-round cap. Each round beyond
+the cap was authorized explicitly and individually by the owner (recorded verbatim
+in `.claude/task/contract.md`'s amendments log), never as a blanket extension. The
+rounds were not repeat nitpicking on a stuck design — round 5 discovered the
+original `Stop`-hook design was fundamentally incompatible with the platform (not
+advisory in practice) and required a full redesign to `PreToolUse`; rounds 6-9
+found and fixed real correctness/guard-integrity/cost issues in that redesign
+(matcher scope leaking into blinded reviewer subagents, an unsound caching layer,
+a missing command self-gate, several doc-sync and citation-accuracy defects); the
+owner twice intervened directly on process grounds (once, verbatim, "You are
+definitely drifting," to stop over-engineering a cost fix for a purely advisory
+hook; once asking "why are we in round 10," which correctly prompted cutting
+review rounds for text-only accuracy corrections rather than re-litigating already
+-passed code). Rounds 10-12 confirmed the final design is sound. Final state:
+both required reviewers PASS on the current diff hash.
 
 ## scope-auditor
 VERDICT: PASS
 risks_checked:
-- Every changed file (`scripts/bootstrap.sh`, `.claude/tests/test_bootstrap.py`,
-  `README.md`, `docs/project-kit-design.md`, the 5 named
-  `docs/decisions/*.md` files, `.claude/task/contract.md`,
-  `.claude/task/review.md`) falls within contract.md's declared
-  scope_paths; no file outside that list was touched across any round.
-- Both plan-revision decisions made during planning (a minimal version
-  stamp instead of porting `dbt-agent-kit`'s full `sync-base.sh` mechanism;
-  no `refresh_dir "templates"`) are recorded with real technical
-  reasoning in `decisions_reserved`, not asserted without justification,
-  and held unchanged through all 3 rounds of fixes.
-- The honest-limitation disclosure added in round 1 (`generate_project_setup.py`
-  doesn't persist which stack flags a project was generated with, so
-  re-running it later requires the owner to remember and re-supply them) is
-  present and mutually consistent across `README.md`,
-  `docs/project-kit-design.md`, and
-  `docs/decisions/minimal-version-stamp-vs-sync-mechanism.md` — re-verified
-  at every subsequent round, never softened or silently removed.
-- The 5 ADRs in `docs/decisions/` accurately represent decisions already
-  made in earlier, merged phases (cross-checked against
-  `.claude/rules/guard-paths.md`'s own text and
-  `scripts/audit_ci_automation.py`'s docstring for two of them) rather than
-  being embellished after the fact; the one inaccurate claim found in
-  review (an unmatched stack automatically drafting from
-  `templates/reviewers/_skeleton.md`, which no code path actually does) was
-  corrected in round 1.
-- No new owner-level decision was introduced silently by any round's
-  fixes, including the round-2 replacement of the entire path-comparison
-  approach with a plain filesystem existence check — a technical
-  correctness fix, not a product/scope decision.
+- Recurrence of the round-6/round-11 stale-`Stop`-language defect class in
+  `.claude/task/contract.md`'s `decisions_reserved`/`done_when` — grepped every
+  `Stop`/`turn-end`/`additionalContext` occurrence rather than reading for it;
+  `done_when` has zero live `Stop` references, `decisions_reserved` retains only
+  three explicitly past-tense historical mentions of the abandoned design.
+- `.claude/settings.json` wiring verified against the real file: `completion_gate.py`
+  sits in the existing `matcher: "Bash"` `PreToolUse` group alongside its five
+  named siblings; no `Stop` group remains anywhere in the file; no other hook
+  wiring touched.
+- Scope containment: every path in the diff is inside `scope_paths`;
+  `_command_utils.py` and `commit_review_gate.py` are listed in scope but
+  genuinely untouched, matching `decisions_reserved`.
+- `done_when`'s event-field list (`main()` only reads `agent_id`, `session_id`,
+  `tool_input.command`) verified directly against the shipped code — no
+  overstated field list remains.
+- Doc-sync: no README or other doc holds a hook inventory this branch would
+  leave stale; `docs/project-kit-design.md` is updated in the same diff.
 
 ## cto-reviewer
 VERDICT: PASS
 risks_checked:
-- **Version-stamp correctness across every checkout shape**: normal
-  checkout (stamps, matches HEAD), worktree (`.git` is a file, not a
-  directory — both the bash `-e` test and the test suite's
-  `os.path.exists` correctly match either), a non-git directory nested
-  inside an unrelated enclosing repo (skips — git is never invoked for the
-  ownership question at all, so there's nothing for it to walk up from),
-  and a corrupted/unborn checkout (skips cleanly, no crash under
-  `set -euo pipefail`).
-- **The path-comparison approach was replaced entirely, not patched
-  further**, after it broke twice on this exact dev environment in earlier
-  rounds (a drive-letter vs. MSYS path-format difference, then a
-  Git-Bash mount-alias between `%TEMP%` and `/tmp` that made even a
-  "normalized" path's string form unstable). The replacement — a plain
-  `[ -e "$KIT_ROOT/.git" ]` existence check — has no path-text comparison
-  anywhere, structurally eliminating the whole class of format/mount-alias
-  mismatch rather than incrementally patching around it.
-- **Test/script parity**: `.claude/tests/test_bootstrap.py`'s
-  `_kit_owed_a_stamp()` mirrors `scripts/bootstrap.sh`'s own gates exactly
-  (git usable → `.git` exists → `rev-parse --verify HEAD` non-empty, in the
-  same order), computed independently of whether the stamp file itself
-  exists — closing the round-2 finding that the original tests were
-  tautological (gated on the very artifact they existed to verify, which
-  would have let the round-1-fix-3 regression ship as a silent CI-green
-  skip rather than a failure).
-- **`set -e` safety**: the new `[ -z "$kit_sha" ] && skip_reason=...` line
-  is exempt from `errexit` (left operand of a `&&` list) — confirmed
-  against an identical pre-existing idiom elsewhere in the same file that
-  the suite already exercises on every run.
-- No new dependency, service, hook, CI step, or permission change across
-  any round; stdlib/`git` only, matching this repo's zero-dependency
-  policy.
-- Three narrow, explicitly non-blocking observations were raised at round
-  3 and recorded (not fixed) in `.claude/task/contract.md`'s amendments
-  log rather than opening a further round: a corrupted (not merely absent)
-  `.git` nested in an unrelated repo could still mis-stamp; the skip
-  message doesn't distinguish "unborn HEAD" from "git unavailable" from
-  "ownership refusal"; two doc sentences say "every run" without the
-  "when git history is available" qualifier the script's own visible skip
-  line already covers in practice.
+- Executable-surface identity since round 11: `review_input.patch` is
+  hunk-for-hunk identical to what was already reviewed and passed — same hook
+  body, `settings.json` wiring, both test files, three docs. No new dependency,
+  no lockfile/CI/permission change, no secret-shaped content.
+- Fail-open/never-blocks guarantee: `completion_gate.py`'s single top-level
+  `try` returns 0 on any exception (including a non-dict event payload, fixed
+  in round 7 and covered by `test_fails_open_on_non_dict_event`), and it never
+  sets `permissionDecision` — proven structurally by
+  `test_fails_open_when_gate_raises`/`_assert_never_denies`, not just asserted.
+- Command self-gate correctness: `git_subcommand`/`simple_commands` usage in
+  `_is_relevant` traced against real compound/chained/global-flag command
+  shapes (`git -C repo status`, `git add -A && git commit`, `(git push)`,
+  `echo "git status"`) — no false negative that would silently defeat the
+  hook, no false positive that reintroduces the old per-Bash-call cost.
+- Cost/cadence claims in `completion_gate.py`'s docstring and
+  `docs/project-kit-design.md` verified directly against `commit_review_gate.py`
+  source: the trigger set is a strict superset of `commit_review_gate.py`'s,
+  dominated by `git status`; `_gate()` genuinely runs twice on an actual
+  `git commit` (two independent processes, no shared state); `git push` is
+  confirmed NOT covered by `pre_push_gate.py` (read in full — it only emits a
+  static checklist, never reads review state).
+- Contract-to-code consistency of the final `decisions_reserved`/`done_when`
+  wording, cross-checked against the literal shipped source
+  (`emit_context("PreToolUse", ...)`, `_is_relevant`'s trigger set,
+  `crg._repo_root()`'s real implementation).
