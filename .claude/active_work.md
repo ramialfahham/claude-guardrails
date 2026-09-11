@@ -220,12 +220,12 @@ mechanism earns its complexity then, not preemptively.
   drift into NEW projects by deriving `guard-paths.md` fresh from the
   composed routing every time, but doesn't fix the kit's own existing copy).
 
-### Minor cleanup still NOT done (deferred across many sessions now)
+### Minor cleanup — done
 
-`.claude/hooks/__pycache__/*.pyc` tracked in git from before `.gitignore`
-existed — `git rm -r --cached .claude/hooks/__pycache__` as its own tiny
-standalone commit. Already caused one real rebase-blocking incident. Just do
-it next time someone's touching hooks anyway.
+`.claude/hooks/__pycache__/*.pyc` (tracked in git from before `.gitignore`
+existed, deferred across many sessions, already caused one real
+rebase-blocking incident) untracked via `git rm -r --cached` in its own
+standalone commit/MR.
 
 ## Earlier, unrelated to the above
 
