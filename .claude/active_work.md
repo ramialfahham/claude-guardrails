@@ -1,6 +1,6 @@
 # Active work
 
-## Post-plan hardening — Phase 1 done, MR !18 open (not yet merged)
+## Post-plan hardening — Phase 1 merged, sandboxing ADR in review
 
 Separate initiative from the 7-phase plan below (that one really is complete).
 Triggered by the owner directly asking whether this kit reflects Anthropic's
@@ -25,9 +25,9 @@ actual published Claude Code guidance — it never had been checked. Research
    Code's built-in `/code-review`. **Shipped**:
    `docs/decisions/custom-review-gate-vs-code-review-skill.md`.
 
-**MR**: !18, `feat/stop-hook-completion-gate` → `main`. Not merged yet — this
-handover assumes it lands as-is; if it doesn't, re-read the MR before trusting
-anything below about `completion_gate.py`.
+**Merged**: MR !18 (`feat/stop-hook-completion-gate`), MR !19 (handover
+update), and MR !20 (untracked `.claude/hooks/__pycache__/*.pyc`, unrelated
+cleanup). CI green on `main` after each.
 
 ### The one thing worth reading in full before touching `completion_gate.py` again
 
@@ -92,13 +92,17 @@ effort clearly exceeds what the feature warrants, that's worth naming
 out loud rather than continuing to spin the loop because each individual
 round was locally justified.
 
-### Later phases of this hardening initiative (not yet contracted)
+### Later phases of this hardening initiative
 
-Deferred, not dropped — flagged in the original research as real gaps, lower
-priority than the 3 above: sandboxing adoption (`/sandbox`), parallel-session/
-worktree safety audit, headless-mode (`claude -p`) compatibility audit. Each
-gets its own phase contract when picked up, or an explicit "considered, not
-building yet" ADR if it turns out not worth it.
+**Sandboxing adoption — in review**, not yet merged. New ADR
+`docs/decisions/sandboxing-recommended-not-defaulted.md` on branch
+`feat/sandboxing-recommendation`; no code changes. See the ADR itself for
+what it covers — don't duplicate the summary here across a third file.
+
+**Not yet contracted**, lower priority, deferred not dropped: parallel-session/
+worktree safety audit and headless-mode (`claude -p`) compatibility audit.
+Each gets its own phase contract when picked up, or an explicit "considered,
+not building yet" ADR if it turns out not worth it.
 
 ## `claude-project-kit` — all 7 phases (+1b) merged. Plan complete.
 

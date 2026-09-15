@@ -168,6 +168,14 @@ For why this kit builds its own gate rather than using Claude Code's
 built-in `/code-review`, see
 [`docs/decisions/custom-review-gate-vs-code-review-skill.md`](decisions/custom-review-gate-vs-code-review-skill.md).
 
+Separately from this kit's own gate, Claude Code's built-in `/sandbox`
+restricts what a Bash command can touch at the OS level — a different,
+complementary layer, and one this kit recommends project owners enable
+themselves rather than shipping on by default. See
+[`docs/decisions/sandboxing-recommended-not-defaulted.md`](decisions/sandboxing-recommended-not-defaulted.md)
+for the reasoning, including a real but partial synergy with this kit's own
+`guard-paths.md`.
+
 ## Keeping a project up to date
 
 `bootstrap.sh` stamps `.claude/.kit-version` (this kit's own commit SHA) on
