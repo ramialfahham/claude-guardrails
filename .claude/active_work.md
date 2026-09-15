@@ -1,6 +1,6 @@
 # Active work
 
-## Post-plan hardening — Phase 1 merged, sandboxing ADR in review
+## Post-plan hardening — Phase 1 and sandboxing ADR both merged
 
 Separate initiative from the 7-phase plan below (that one really is complete).
 Triggered by the owner directly asking whether this kit reflects Anthropic's
@@ -26,8 +26,9 @@ actual published Claude Code guidance — it never had been checked. Research
    `docs/decisions/custom-review-gate-vs-code-review-skill.md`.
 
 **Merged**: MR !18 (`feat/stop-hook-completion-gate`), MR !19 (handover
-update), and MR !20 (untracked `.claude/hooks/__pycache__/*.pyc`, unrelated
-cleanup). CI green on `main` after each.
+update), MR !20 (untracked `.claude/hooks/__pycache__/*.pyc`, unrelated
+cleanup), and MR !21 (sandboxing ADR — see below). CI green on `main` after
+each.
 
 ### The one thing worth reading in full before touching `completion_gate.py` again
 
@@ -94,10 +95,28 @@ round was locally justified.
 
 ### Later phases of this hardening initiative
 
-**Sandboxing adoption — in review**, not yet merged. New ADR
-`docs/decisions/sandboxing-recommended-not-defaulted.md` on branch
-`feat/sandboxing-recommendation`; no code changes. See the ADR itself for
-what it covers — don't duplicate the summary here across a third file.
+**Sandboxing adoption — merged (MR !21).** New ADR
+`docs/decisions/sandboxing-recommended-not-defaulted.md`. No code changes.
+See the ADR itself for what it covers — don't duplicate the summary here
+across a third file.
+
+Went through **6 review rounds** on a zero-code, 3-file documentation change
+(full account in that branch's `.claude/task/contract.md` git history). Worth
+knowing before writing another ADR in this repo: every round found something
+real, but the recurring failure mode was one paragraph (explaining exactly
+which `guard-paths.md` patterns Anthropic's sandbox happens to protect)
+getting MORE elaborate each time reviewers asked for more precision — and each
+elaboration introduced a fresh instance of the same underlying defect (a
+claim resting on source text that was quoted partially or not examined at
+all; at one point a flatly false claim about this exact repo's own
+filesystem, since `.git/hooks/` demonstrably exists here). A reviewer
+explicitly named the pattern and recommended cutting the paragraph down to
+what was actually defensible instead of continuing to patch it — that's what
+finally closed it. **Lesson**: when a reviewer keeps finding a new problem in
+the same passage after multiple attempts to fix it, the fix is usually to
+simplify the claim, not to add another qualifier — matches the exact lesson
+from `completion_gate.py`'s own fingerprint-cache saga above, just at the
+prose level instead of the code level.
 
 **Not yet contracted**, lower priority, deferred not dropped: parallel-session/
 worktree safety audit and headless-mode (`claude -p`) compatibility audit.
