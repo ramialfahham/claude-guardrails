@@ -1,6 +1,6 @@
 # Review
 
-diff_sha256: 1c46ee410b41edeb70779cd272e6ff1cc4f8d19d8f5656264820760ac4a99ae5
+diff_sha256: 48d19b795324b3f386c1f84f00ba1c0518c12a2b1093ac053d2c98c8cfd463d9
 
 ## scope-auditor
 VERDICT: PASS
@@ -18,3 +18,9 @@ risks_checked:
   the overwrite policy to the working agreement). No new mechanism, hook, or dependency.
 - Doc sync: `README.md` and `CLAUDE.md`'s descriptions of `active_work.md` as the "session
   handover" file remain accurate against the new, shorter version.
+- Follow-up commit (this diff): added one paragraph to `active_work.md` noting MR !24 is
+  open (not merged — wording says "awaiting owner merge") and that the `origin` GitHub
+  remote is returning 403/suspended (hedged "for now"). Confirmed via `git diff --cached`
+  that only `.claude/active_work.md` changed — the scope-auditor agent itself has no Bash
+  access to run that check, so it was verified directly instead of re-delegated. No new
+  mechanism or decision; pure state recording.
