@@ -7,25 +7,16 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-One thing in flight, on branch `chore/retire-cto-reviewer-and-rename-repo` (not yet an MR,
-under its own review cycle — `.claude/task/contract.md` has the details): the in-repo half of
-a repo rename plus a reviewer retirement.
+All planned work is merged to `main`. Nothing is in flight.
 
-The GitLab-side rename itself is already done and live (via the GitLab API, not part of this
-branch's diff): `claude-guardrails` → `claude-project-kit`
-(`rami.al-fahham/claude-project-kit`), local `gitlab` remote repointed. What's still on the
-branch, awaiting review/merge: every in-repo text reference to the old name, and retiring
-this kit's own self-governance reviewer, `.claude/agents/cto-reviewer.md` — a straight rename
-would have collided with the already-existing, near-identical
-`templates/reviewers/platform-reviewer.md` module, so the owner chose to delete
-`cto-reviewer.md` and use the module's `platform-reviewer.md` directly instead. `dbt-agent-kit`'s
-`scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate follow-up task in
-that repo (`task_5ad700d5`), deliberately not fixed here since it's cross-repo work.
-
-Otherwise, all prior planned work is merged to `main`, including
-[MR !24](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/24) (this
-file's own 310→54 line prune into a current-state snapshot, plus the overwrite-not-append
-policy in `working-agreement.md`).
+This repo was renamed `claude-guardrails` → `claude-project-kit`
+(`rami.al-fahham/claude-project-kit` on GitLab; local `gitlab` remote repointed), and this
+kit's own self-governance reviewer, `.claude/agents/cto-reviewer.md`, was retired in favor of
+using `templates/reviewers/platform-reviewer.md` directly (a straight rename would have
+collided by filename with that already-existing module) —
+[MR !26](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/26), merged.
+`dbt-agent-kit`'s `scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate
+follow-up task in that repo (`task_5ad700d5`), deliberately not fixed here (cross-repo).
 
 The `origin` GitHub remote (`ramialfahham/claude-guardrails`) is permanently out of scope —
 account suspended (403), treat `gitlab` as the only remote, don't re-flag this.
