@@ -7,14 +7,14 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-One thing in flight: [MR !24](https://gitlab.com/rami.al-fahham/claude-guardrails/-/merge_requests/24)
-(`chore/prune-active-work-handover`) — this file's own 310→54 line prune, plus the
-overwrite-not-append policy added to `working-agreement.md`. Reviewed (scope-auditor PASS),
-pushed, awaiting owner merge. Also noted: the `origin` GitHub remote
-(`ramialfahham/claude-guardrails`) is returning 403 ("account suspended") — `gitlab` is the
-working remote for now; fix the GitHub side outside this session if you want it back.
+All planned work is merged to `main`, including
+[MR !24](https://gitlab.com/rami.al-fahham/claude-guardrails/-/merge_requests/24) (this
+file's own 310→54 line prune into a current-state snapshot, plus the overwrite-not-append
+policy in `working-agreement.md`). Nothing is in flight.
 
-Otherwise, all planned work is merged to `main`.
+Open, unresolved: the `origin` GitHub remote (`ramialfahham/claude-guardrails`) is returning
+403 ("account suspended") — `gitlab` is the working remote for now; fix the GitHub side
+outside this session if you want it back.
 
 - The 7-phase `claude-project-kit` build (bootstrap + tailored `/setup-project` generation,
   reviewer module library, CI-provider audit) — complete. See `docs/project-kit-design.md`
