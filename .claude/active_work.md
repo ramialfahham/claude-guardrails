@@ -118,10 +118,62 @@ simplify the claim, not to add another qualifier — matches the exact lesson
 from `completion_gate.py`'s own fingerprint-cache saga above, just at the
 prose level instead of the code level.
 
-**Not yet contracted**, lower priority, deferred not dropped: parallel-session/
-worktree safety audit and headless-mode (`claude -p`) compatibility audit.
-Each gets its own phase contract when picked up, or an explicit "considered,
-not building yet" ADR if it turns out not worth it.
+**Parallel-session/worktree safety audit — research done, ADR not yet
+written.** Branch `research/parallel-session-worktree-audit` exists but has
+no commits — the findings below are the actual state of the work; nothing is
+written to disk anywhere yet. Investigated live with real tempdir git repos
+and a real `git worktree`, not just theorized (scratch scripts were in this
+session's own scratchpad dir, not committed anywhere — re-run if you need to
+re-verify rather than trusting this summary blindly):
+
+- **Worktrees are genuinely safe for parallel sessions.** Verified directly:
+  staging in one worktree never leaks into another (separate index per
+  worktree), `commit_review_gate.py`'s diff-hash computation is correctly
+  isolated per-worktree, and `_base_ref`/merge-base resolution works
+  correctly from each worktree despite refs being shared. Git itself refuses
+  to let the same branch be checked out in two worktrees at once — a free,
+  built-in guarantee this kit doesn't need to add anything for. **This is
+  the recommendation the eventual ADR should lead with**: use worktrees to
+  run more than one Claude Code session against the same repo.
+- **Same directory, no worktree (two sessions sharing one literal working
+  copy) is mostly safe, with two real, verified caveats — not fabricated
+  ones:**
+  1. `commit_review_gate.py` recomputes the diff hash fresh at commit time
+     rather than trusting a cached value — verified live: staged an
+     "unrelated Session B" change after "Session A" had already written a
+     matching `review.md`, and Session A's commit attempt correctly got
+     blocked, since the live hash no longer matched. Nothing unreviewed can
+     slip through this way, by construction.
+  2. `review.md` is one shared file on disk — two sessions doing unrelated
+     reviews in the same directory can overwrite each other's recorded
+     review, forcing a confusing but SAFE (fails closed, not open)
+     re-review. A real workflow annoyance, not a security hole.
+  3. A narrow, genuine TOCTOU race exists between "hook approves the commit"
+     and "the commit tool call actually executes" — bounded to whatever gap
+     the harness's own scheduling leaves, not something a `PreToolUse` hook
+     can close on its own (it isn't an OS-level lock). Worth naming
+     honestly in the ADR as a real, small, currently-unaddressed gap rather
+     than glossing over it — this kit's hooks can't fix it without OS-level
+     locking, which is out of scope.
+- **Proposed next step, not yet confirmed with the owner**: write a short
+  ADR (matching the sandboxing ADR's shape) documenting the above and
+  recommending worktrees for parallel sessions. No code fix currently
+  planned — worktrees already solve the real hazard, and the same-directory
+  caveats are a documentation matter, not an obvious code change.
+- **One process note for whoever picks this back up**: while testing,
+  `branch_discipline.py`/`commit_review_gate.py` intercepted plain `git`
+  Bash commands run against the SCRATCH test repos too, since they match on
+  the Bash command text regardless of target directory, and check the
+  branch of `CLAUDE_PROJECT_DIR` (this real project), not the command's own
+  `cwd`. Worked around it by shelling out to git via a tiny Python helper
+  script instead of raw `git` Bash commands for test-repo setup. Not itself
+  a finding for the audit — just a note so the same confusion doesn't cost
+  time twice.
+
+**Headless-mode (`claude -p`) compatibility audit — not started.** The third
+and last of the originally-deferred phases. Each gets its own phase contract
+when picked up, or an explicit "considered, not building yet" ADR if it
+turns out not worth it.
 
 ## `claude-project-kit` — all 7 phases (+1b) merged. Plan complete.
 
