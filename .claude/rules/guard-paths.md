@@ -7,7 +7,7 @@ just ship a bug; it can silently weaken or disable the thing that's supposed
 to catch defects in the first place.
 
 **Convention**: when a diff you're about to send for review touches any path
-in the list below, spawn the required reviewer(s) — currently `cto-reviewer`,
+in the list below, spawn the required reviewer(s) — currently `platform-reviewer`,
 and any future function-named reviewer routed to a guard path — with
 `model: opus` instead of their frontmatter default (`sonnet`). `scope-auditor`
 is exempted: it's required on every commit regardless of path, so escalating

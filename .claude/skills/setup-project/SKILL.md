@@ -1,6 +1,6 @@
 ---
 name: setup-project
-description: Interview to select, preview, and (with explicit confirmation) generate reviewer modules, routing, guard-paths, and a starter README for a project from claude-guardrails.
+description: Interview to select, preview, and (with explicit confirmation) generate reviewer modules, routing, guard-paths, and a starter README for a project from claude-project-kit.
 disable-model-invocation: true
 ---
 
@@ -11,12 +11,12 @@ confirmation in step 9, separate from step 6's "does this reviewer set look
 right" confirmation. State this distinction to the user before asking
 anything, and restate what actually happened (or didn't) at the end.
 
-**This skill only works from a `claude-guardrails` checkout.** It calls
+**This skill only works from a `claude-project-kit` checkout.** It calls
 `scripts/preview_project_setup.py`, which reads `templates/reviewers/` —
 neither is copied into a repo bootstrapped from this kit (`bootstrap.sh`
 copies `.claude/{hooks,agents,commands,skills,tests}` only). If that script
 isn't found at the repo root, tell the user this skill needs to run from
-inside the `claude-guardrails` repo itself, not from a project it already
+inside the `claude-project-kit` repo itself, not from a project it already
 set up, and stop — do not attempt the interview.
 
 ## Steps
@@ -108,7 +108,7 @@ set up, and stop — do not attempt the interview.
    was written. Never assume or guess a target path.
 
 8. Check whether `<target>/.claude/settings.json` exists. If it doesn't,
-   tell the user this project isn't bootstrapped by claude-guardrails yet
+   tell the user this project isn't bootstrapped by claude-project-kit yet
    and offer to run `scripts/bootstrap.sh <target>` — wait for their
    go-ahead before running it, never run it silently. If bootstrapping
    fails or they decline, stop here.

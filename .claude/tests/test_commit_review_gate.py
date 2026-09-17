@@ -335,9 +335,9 @@ def test_routing_matches_the_dotclaude_prefixed_paths():
     # under-requires reviewers.
     routing = _load_routing(_REPO_ROOT)
     assert routing is not None, "review_routing.json should load from the repo root"
-    assert "cto-reviewer" in _required_reviewers([".claude/agents/scope-auditor.md"], routing)
-    assert "cto-reviewer" in _required_reviewers([".claude/tests/test_x.py"], routing)
-    assert "cto-reviewer" in _required_reviewers([".claude/hooks/commit_review_gate.py"], routing)
+    assert "platform-reviewer" in _required_reviewers([".claude/agents/scope-auditor.md"], routing)
+    assert "platform-reviewer" in _required_reviewers([".claude/tests/test_x.py"], routing)
+    assert "platform-reviewer" in _required_reviewers([".claude/hooks/commit_review_gate.py"], routing)
     # scope-auditor always; a plain doc pulls in no domain reviewer.
     assert _required_reviewers(["README.md"], routing) == {"scope-auditor"}
 

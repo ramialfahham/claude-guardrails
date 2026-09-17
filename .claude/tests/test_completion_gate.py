@@ -263,7 +263,7 @@ def test_no_note_when_properly_reviewed():
 
 
 def test_no_note_for_subagent_issued_tool_call():
-    # A subagent (this repo's own scope-auditor/cto-reviewer included) calls
+    # A subagent (this repo's own scope-auditor/platform-reviewer included) calls
     # tools with an `agent_id` in the event — a hook firing on those must be
     # skipped, since the diff under review is by definition unreviewed at
     # review time, and this note ("...run the required reviewers and write

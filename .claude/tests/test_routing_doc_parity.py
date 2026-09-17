@@ -38,13 +38,13 @@ def _parse_guard_paths_section(text: str) -> set[str]:
 
 
 # Reads the guard-path-routed reviewer's name FROM the doc's own "Convention"
-# paragraph rather than hardcoding "cto-reviewer" — this file is copied
-# VERBATIM into every project by scripts/bootstrap.sh's `refresh_dir
-# ".claude/tests"`, where the name is "platform-reviewer", not this kit's
-# own legacy name. Matches both this kit's own phrasing ("...reviewer(s) —
-# currently `cto-reviewer`, and any future...") and a generated project's
-# ("...reviewer(s) — `platform-reviewer` — with...") — anything between the
-# dash and the first backtick-quoted name is skipped, non-greedily.
+# paragraph rather than hardcoding a name — this file is copied VERBATIM into
+# every project by scripts/bootstrap.sh's `refresh_dir ".claude/tests"`, and
+# this kit's own name and a generated project's have diverged before (this
+# kit's own reviewer used to be "cto-reviewer" while generated projects
+# always got "platform-reviewer") and could again — anything between the
+# dash and the first backtick-quoted name is skipped, non-greedily, so either
+# phrasing parses regardless of which name is currently in use where.
 _ESCALATE_REVIEWER_RE = re.compile(
     r"spawn the required reviewer\(s\)\s*—.*?`([a-z][a-z0-9-]*)`", re.DOTALL)
 
@@ -98,9 +98,9 @@ def test_routed_to_reviewer_ignores_other_reviewers():
 
 
 def test_escalate_reviewer_name_reads_from_the_doc_not_hardcoded():
-    # this file is copied VERBATIM into every project by bootstrap.sh, where
-    # the name is "platform-reviewer", not this kit's own "cto-reviewer" —
-    # both phrasings (this kit's own, and a generated project's) must parse
+    # this file is copied VERBATIM into every project by bootstrap.sh, and
+    # this kit's own name and a generated project's have diverged before (see
+    # the comment above _ESCALATE_REVIEWER_RE) — both phrasings must parse
     cto_phrasing = ("spawn the required reviewer(s) — currently "
                      "`cto-reviewer`, and any future function-named reviewer")
     assert _escalate_reviewer_name(cto_phrasing) == "cto-reviewer"

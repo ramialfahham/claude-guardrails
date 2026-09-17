@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bootstrap.sh — add the claude-guardrails guardrails to an EXISTING repo.
+# bootstrap.sh — add the claude-project-kit guardrails to an EXISTING repo.
 #
 # Copies this kit checkout's self-contained `.claude/` (hooks, reviewers, skills,
 # settings, working agreement, routing) plus the `task/` templates into a target
@@ -9,7 +9,7 @@
 # Usage:
 #   scripts/bootstrap.sh [--force] [--dry-run] TARGET_REPO
 #
-# Run it from a checkout of claude-guardrails; TARGET_REPO is the repo to guard.
+# Run it from a checkout of claude-project-kit; TARGET_REPO is the repo to guard.
 #
 # Safe to re-run. Kit CODE (hooks/agents/commands/skills/tests + task templates)
 # is refreshed every run, and .claude/.kit-version is stamped with this checkout's
@@ -57,7 +57,7 @@ if [ "$TARGET_ABS" = "$KIT_ROOT" ]; then
   exit 1
 fi
 [ -f "$KIT_ROOT/.claude/settings.json" ] || {
-  echo "bootstrap: '$KIT_ROOT' doesn't look like a claude-guardrails checkout" >&2; exit 1; }
+  echo "bootstrap: '$KIT_ROOT' doesn't look like a claude-project-kit checkout" >&2; exit 1; }
 [ -d "$TARGET_ABS/.git" ] || echo "bootstrap: note — '$TARGET' has no .git (not a git repo yet)"
 
 # run CMD... — execute, or just print under --dry-run.
@@ -95,7 +95,7 @@ keep_file() {
   echo "write  $rel"
 }
 
-echo "Bootstrapping claude-guardrails guardrails"
+echo "Bootstrapping claude-project-kit guardrails"
 echo "  from: $KIT_ROOT"
 echo "  into: $TARGET_ABS"
 [ "$DRY" -eq 1 ] && echo "  (dry run — no files written)"
@@ -179,7 +179,7 @@ if [ ! -e "$TARGET_ABS/.claude/active_work.md" ]; then
     printf '%s\n' \
       "# Active work" \
       "" \
-      "_Bootstrapped with claude-guardrails. Record where you are so the next session continues cleanly._" \
+      "_Bootstrapped with claude-project-kit. Record where you are so the next session continues cleanly._" \
       > "$TARGET_ABS/.claude/active_work.md"
   fi
   echo "write  .claude/active_work.md (starter)"
