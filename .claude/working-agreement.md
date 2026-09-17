@@ -18,6 +18,9 @@ explicit "go" before editing files or running commands.**
 Exploring tradeoffs or being asked a question is not permission to change the repo.
 Answer, recommend, then wait. When unsure, ask one short question instead of acting.
 At the end of a session, update `.claude/active_work.md` so the next one continues cleanly.
+This file is a **current-state snapshot, overwritten** — not an append-only log. Remove
+whatever is now merged/done/stale instead of narrating it; history belongs in git log and
+merged MR descriptions, not here.
 
 ## 2. The task contract + review cycle
 
