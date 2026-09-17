@@ -7,7 +7,7 @@ The blinded review gate. When you run `git commit`, this:
      PLUS what's currently staged — not just the staged diff alone. A
      multi-commit branch's review must cover the whole branch, not silently
      just its last increment; this also matches what the reviewer agent
-     prompts (cto-reviewer.md, scope-auditor.md) already say their own input
+     prompts (platform-reviewer.md, scope-auditor.md) already say their own input
      is ("the cumulative branch diff vs the base branch").
   2. works out which reviewers are required for the changed files
      (.claude/review_routing.json in the project),

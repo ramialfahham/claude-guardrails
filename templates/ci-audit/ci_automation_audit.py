@@ -8,7 +8,7 @@ and register it as a `SessionStart` hook in `.claude/settings.json`, it
 prints a non-blocking context note at the start of a session if any
 `.github/workflows/*.yml` or `.gitlab-ci.yml` file combines a
 schedule/dispatch trigger with an auto-merge action — the actual shape of a
-real incident (see `scripts/audit_ci_automation.py` in `claude-guardrails`
+real incident (see `scripts/audit_ci_automation.py` in `claude-project-kit`
 for the full writeup and the heavier, deliberately-run tool this is a
 lightweight cousin of).
 

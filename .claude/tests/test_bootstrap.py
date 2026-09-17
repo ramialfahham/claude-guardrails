@@ -35,7 +35,7 @@ _EXPECTED = [
     ".claude/hooks/commit_review_gate.py",
     ".claude/hooks/preflight.sh",
     ".claude/agents/scope-auditor.md",
-    ".claude/agents/cto-reviewer.md",
+    ".claude/agents/platform-reviewer.md",
     ".claude/commands/status.md",
     ".claude/skills/setup-project/SKILL.md",
     ".claude/tests/test_commit_review_gate.py",

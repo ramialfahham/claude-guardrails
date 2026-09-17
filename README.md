@@ -1,6 +1,6 @@
-# claude-guardrails
+# claude-project-kit
 
-[![CI](https://github.com/ramialfahham/claude-guardrails/actions/workflows/ci.yml/badge.svg)](https://github.com/ramialfahham/claude-guardrails/actions/workflows/ci.yml)
+[![Pipeline](https://gitlab.com/rami.al-fahham/claude-project-kit/badges/main/pipeline.svg)](https://gitlab.com/rami.al-fahham/claude-project-kit/-/pipelines)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Repo-level guardrails for AI-assisted development, in any language. They live in a
@@ -59,8 +59,8 @@ Hooks fail open on error, so a bug can't lock you out; the guards that stop you 
 Clone this and run the bootstrap script against your target repo:
 
 ```bash
-git clone https://github.com/ramialfahham/claude-guardrails
-claude-guardrails/scripts/bootstrap.sh /path/to/your-repo
+git clone https://gitlab.com/rami.al-fahham/claude-project-kit
+claude-project-kit/scripts/bootstrap.sh /path/to/your-repo
 ```
 
 It copies the `.claude/` guardrails and the `task/` templates in — no plugin, nothing global.
@@ -70,7 +70,7 @@ preview). Then commit the new `.claude/` and approve the hooks on the next Claud
 Run it with `--help` for the full usage.
 
 **Getting a tailored reviewer set, not just the two defaults.** Run the `/setup-project` skill
-from a `claude-guardrails` checkout (in Claude Code, after cloning this repo) to interview you
+from a `claude-project-kit` checkout (in Claude Code, after cloning this repo) to interview you
 on your project's stack and generate a reviewer set to match — see
 [What's in the repo](#whats-in-the-repo) below.
 
@@ -94,7 +94,7 @@ instead of leaving you unknowingly unguarded.
 ## What's in the repo
 
 - **`.claude/`** — the guardrails, committed and readable: the hooks (`.claude/hooks/`), the
-  baseline reviewers (`.claude/agents/` — `scope-auditor`, always required, and `cto-reviewer`,
+  baseline reviewers (`.claude/agents/` — `scope-auditor`, always required, and `platform-reviewer`,
   this kit's own general platform reviewer), the `status` command, the `setup-project` interview
   skill (`.claude/skills/setup-project/`), `settings.json` wiring the hooks,
   `working-agreement.md` (the rules the hooks and reviewers reference), and
@@ -114,7 +114,7 @@ instead of leaving you unknowingly unguarded.
   see).
 - **`task/`** — the contract + review templates the review cycle uses.
 
-Run `/setup-project` (a Claude Code skill, from a `claude-guardrails` checkout) to interview a
+Run `/setup-project` (a Claude Code skill, from a `claude-project-kit` checkout) to interview a
 project on its stack and generate a tailored reviewer set instead of the two defaults — see
 `docs/project-kit-design.md` for how the pieces above fit together.
 

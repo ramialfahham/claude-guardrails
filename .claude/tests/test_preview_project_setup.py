@@ -170,7 +170,7 @@ def test_routing_preview_matches_compose_directly():
 
 def test_routing_preview_base_is_not_this_kits_own_routing_file():
     # the decision this contract records: a new project must NOT inherit
-    # this kit's own cto-reviewer routing
+    # this kit's own shipped review_routing.json, whatever it currently routes to
     _require_script()
     preview = pps.build_routing_preview(["platform-reviewer"])
     for reviewers in preview["paths"].values():

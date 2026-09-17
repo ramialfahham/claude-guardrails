@@ -20,7 +20,7 @@ hook cannot see a Task-tool subagent spawn, so there is no way to mechanically
 verify which model a reviewer actually ran on. Follow it because it's the
 right call on a high-stakes diff, not because anything will stop you if you
 don't. A parity test (see `.claude/tests/test_routing_doc_parity.py` in
-`claude-guardrails` for the pattern) can only guarantee this list and
+`claude-project-kit` for the pattern) can only guarantee this list and
 `review_routing.json` agree with each other — it can't verify a reviewer was
 actually spawned at the promoted model.
 

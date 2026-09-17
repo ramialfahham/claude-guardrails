@@ -9,7 +9,7 @@ directly, September 2026.
 
 Claude Code now ships a built-in `/code-review` command/plugin. A technical
 reviewer of this kit would reasonably ask: why build and maintain a custom
-blinded review gate (`scope-auditor`/`cto-reviewer` plus
+blinded review gate (`scope-auditor`/`platform-reviewer` plus
 `commit_review_gate.py`'s enforcement) instead of just using the one that
 already ships with the product? Until now, this repo had no answer to that
 question anywhere — silence, not a considered decision.

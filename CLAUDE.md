@@ -1,4 +1,4 @@
-# claude-guardrails
+# claude-project-kit
 
 This repo **is** the guardrails: a repo-level set of AI-agent guardrails that live in a
 self-contained `.claude/` — no plugin, nothing global, language-agnostic. It is also a live
@@ -20,7 +20,7 @@ The essence:
 
 ## Layout
 
-- `.claude/` — the guardrails: `hooks/`, `agents/` (`scope-auditor`, `cto-reviewer`),
+- `.claude/` — the guardrails: `hooks/`, `agents/` (`scope-auditor`, `platform-reviewer`),
   `commands/` (`status`), `settings.json`, `working-agreement.md`, `review_routing.json`,
   `tests/`.
 - `scripts/bootstrap.sh` — copies `.claude/` into an existing repo.

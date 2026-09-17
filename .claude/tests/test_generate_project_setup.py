@@ -114,7 +114,7 @@ def test_generate_refuses_on_an_unbootstrapped_target():
         assert os.listdir(target) == []
 
 
-def test_dbt_scenario_installs_expected_modules_and_removes_legacy_reviewer():
+def test_dbt_scenario_installs_expected_modules():
     # the plan's own Phase 6 verification note: "at least one dbt project" —
     # same scenario test_preview_project_setup.py already uses, so the
     # generated file set is checked against the SAME expected module list
@@ -122,17 +122,37 @@ def test_dbt_scenario_installs_expected_modules_and_removes_legacy_reviewer():
     with tempfile.TemporaryDirectory() as tmp:
         target = _bootstrapped_target(tmp)
         legacy_path = os.path.join(target, ".claude", "agents", "cto-reviewer.md")
-        assert os.path.isfile(legacy_path), "bootstrap.sh should ship the legacy reviewer"
+        assert not os.path.isfile(legacy_path), (
+            "a fresh bootstrap ships platform-reviewer.md directly, never the "
+            "retired cto-reviewer.md legacy name")
 
         summary = gps.generate(target, pps.SetupAnswers(dbt=True))
 
         assert set(summary["modules_installed"]) == {
             "platform-reviewer", "analytics-engineer-reviewer"}
-        assert summary["legacy_reviewer_removed"] is True
-        assert not os.path.isfile(legacy_path)
+        assert summary["legacy_reviewer_removed"] is False
         for name in summary["modules_installed"]:
             assert os.path.isfile(
                 os.path.join(target, ".claude", "agents", f"{name}.md"))
+
+
+def test_generate_cleans_up_a_pre_rename_legacy_reviewer_file():
+    # coverage for projects bootstrapped before cto-reviewer.md was retired:
+    # bootstrap.sh's own refresh_dir never deletes a file that's merely
+    # absent from a newer kit checkout (plain `cp -R`, no sync/prune), so a
+    # stale copy can genuinely still be sitting in an old project's
+    # .claude/agents/ the first time it's tailored under the new kit.
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        legacy_path = os.path.join(target, ".claude", "agents", "cto-reviewer.md")
+        with open(legacy_path, "w", encoding="utf-8") as f:
+            f.write("---\nname: cto-reviewer\nmodel: sonnet\n---\nbody\n")
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True))
+
+        assert summary["legacy_reviewer_removed"] is True
+        assert not os.path.isfile(legacy_path)
 
 
 def test_non_dbt_scenario_installs_expected_modules():

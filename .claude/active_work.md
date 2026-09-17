@@ -7,14 +7,28 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-All planned work is merged to `main`, including
-[MR !24](https://gitlab.com/rami.al-fahham/claude-guardrails/-/merge_requests/24) (this
-file's own 310→54 line prune into a current-state snapshot, plus the overwrite-not-append
-policy in `working-agreement.md`). Nothing is in flight.
+One thing in flight, on branch `chore/retire-cto-reviewer-and-rename-repo` (not yet an MR,
+under its own review cycle — `.claude/task/contract.md` has the details): the in-repo half of
+a repo rename plus a reviewer retirement.
 
-Open, unresolved: the `origin` GitHub remote (`ramialfahham/claude-guardrails`) is returning
-403 ("account suspended") — `gitlab` is the working remote for now; fix the GitHub side
-outside this session if you want it back.
+The GitLab-side rename itself is already done and live (via the GitLab API, not part of this
+branch's diff): `claude-guardrails` → `claude-project-kit`
+(`rami.al-fahham/claude-project-kit`), local `gitlab` remote repointed. What's still on the
+branch, awaiting review/merge: every in-repo text reference to the old name, and retiring
+this kit's own self-governance reviewer, `.claude/agents/cto-reviewer.md` — a straight rename
+would have collided with the already-existing, near-identical
+`templates/reviewers/platform-reviewer.md` module, so the owner chose to delete
+`cto-reviewer.md` and use the module's `platform-reviewer.md` directly instead. `dbt-agent-kit`'s
+`scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate follow-up task in
+that repo (`task_5ad700d5`), deliberately not fixed here since it's cross-repo work.
+
+Otherwise, all prior planned work is merged to `main`, including
+[MR !24](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/24) (this
+file's own 310→54 line prune into a current-state snapshot, plus the overwrite-not-append
+policy in `working-agreement.md`).
+
+The `origin` GitHub remote (`ramialfahham/claude-guardrails`) is permanently out of scope —
+account suspended (403), treat `gitlab` as the only remote, don't re-flag this.
 
 - The 7-phase `claude-project-kit` build (bootstrap + tailored `/setup-project` generation,
   reviewer module library, CI-provider audit) — complete. See `docs/project-kit-design.md`
@@ -25,11 +39,6 @@ outside this session if you want it back.
 
 ## Open owner decisions (none blocking, none scheduled)
 
-- Rename this repo to `claude-project-kit` — deferred since Phase 1; `dbt-agent-kit`'s
-  `scripts/sync-base.sh` hardcodes this repo's current GitHub URL as its sync source, so a
-  rename needs that fixed in the same pass.
-- Rename `.claude/agents/cto-reviewer.md` — deferred; it's also the file generation removes
-  from every new project, so this is purely about this kit's own self-governance file.
 - Whether/how to wire `templates/ci-audit/ci_automation_audit.py` as an actual
   `SessionStart` hook anywhere (currently inert everywhere, by design).
 - Whether `templates/*` should be its own guard path in `review_routing.json`/

@@ -23,8 +23,10 @@ ceo, coo, cio, ciso, vp, evp, svp, director, head, chief, president, founder,
 owner, manager, lead, boss, exec, executive — matched as whole tokens, so
 `leaderboard-reviewer` is not flagged for containing "lead").
 
-`.claude/agents/cto-reviewer.md`, already shipped elsewhere in this kit, is a
-known, documented exception — not a precedent for new names.
+This kit's own self-governance reviewer used to be a documented exception —
+`.claude/agents/cto-reviewer.md` — until it was retired in favor of shipping
+`platform-reviewer.md` directly, so there is currently no live exception; a
+future one would need the same kind of explicit callout, not silent reuse.
 
 ## `applies_when` tags
 

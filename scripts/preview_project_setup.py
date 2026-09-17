@@ -59,9 +59,9 @@ import compose_routing  # noqa: E402
 import lint_reviewer_name  # noqa: E402
 
 # The guard-path-routed reviewer for a NEW project is always platform-reviewer
-# (applies_when: [always], so it's selected for every project) — never this
-# kit's own cto-reviewer, which is a legacy name specific to claude-guardrails'
-# own self-governance (rename deferred, see active_work.md). scope-auditor is
+# (applies_when: [always], so it's selected for every project) — same name
+# this kit's own self-governance copy now uses too (the old cto-reviewer.md
+# legacy name was retired; see active_work.md history). scope-auditor is
 # exempted for the same reason it's exempted in this kit's own guard-paths.md:
 # it's the one reviewer required on every commit regardless of path, so
 # escalating it would multiply cost for the highest-frequency reviewer.
@@ -69,8 +69,7 @@ _GUARD_PATH_REVIEWER = "platform-reviewer"
 _EXEMPTED_REVIEWER = "scope-auditor"
 
 # The composition base for a NEW project — deliberately NOT this kit's own
-# shipped .claude/review_routing.json, which still routes to `cto-reviewer`
-# (see _GUARD_PATH_REVIEWER above). A new project starts from just the
+# shipped .claude/review_routing.json. A new project starts from just the
 # universal "scope-auditor always runs" rule; everything else comes from the
 # selected modules' own routing fragments.
 _BASE_ROUTING: dict = {

@@ -1,4 +1,4 @@
-# How `claude-guardrails` is built
+# How `claude-project-kit` is built
 
 This is an overview for someone sizing up the kit — how the pieces fit
 together and why they're shaped the way they are. For "how do I use this,"
@@ -16,7 +16,7 @@ the only layer a bootstrapped project's own Claude Code session ever
 executes.
 
 **`templates/`** is the kit's own content library, read directly from a
-`claude-guardrails` checkout — never copied into a target project.
+`claude-project-kit` checkout — never copied into a target project.
 `templates/reviewers/*.md` holds the hand-authored reviewer modules
 (`platform-reviewer`, `data-engineer-reviewer`, `analytics-engineer-reviewer`,
 `frontend-reviewer`, `security-reviewer`), each tagged with an `applies_when`
@@ -43,15 +43,16 @@ scanner).
    in. Safe to re-run: kit code always refreshes, project-owned config
    (`settings.json`, `review_routing.json`, `working-agreement.md`) is
    preserved unless `--force`.
-2. From that same `claude-guardrails` checkout, run the `/setup-project`
+2. From that same `claude-project-kit` checkout, run the `/setup-project`
    skill (a Claude Code skill, `disable-model-invocation: true` — invoke it
    explicitly). It interviews the project's stack via `AskUserQuestion`,
    shows a preview of the reviewer set/routing/guard-paths it would generate
    (`preview_project_setup.py`, writes nothing), then — after an explicit
    second confirmation — actually generates it
    (`generate_project_setup.py`): copies the selected reviewer modules into
-   `.claude/agents/`, removes the bootstrap-default `cto-reviewer.md` in
-   favor of the tailored set, composes and writes `review_routing.json`,
+   `.claude/agents/`, removes any leftover legacy `cto-reviewer.md` (a name
+   retired in favor of shipping `platform-reviewer.md` directly), composes
+   and writes `review_routing.json`,
    renders `.claude/rules/guard-paths.md`, and writes a starter `README.md`
    if none exists.
 3. Generation ends with a smoke test: it runs the target's own
@@ -67,7 +68,7 @@ one generic reviewer assembled from interview flags.
 
 ## The review gate
 
-Every commit in a `claude-guardrails`-governed project goes through the same
+Every commit in a `claude-project-kit`-governed project goes through the same
 cycle, whether in this kit's own repo or a generated one:
 
 1. Stage the change.
@@ -131,7 +132,7 @@ can't distinguish two different states that happen to produce identical
 reason text). It also skips any tool call issued by a subagent (checks the
 `agent_id` field Anthropic's hooks reference documents as present only in
 that case) — without this, this repo's own blinded reviewers
-(`scope-auditor`, `cto-reviewer`) could have this hook's "go run the
+(`scope-auditor`, `platform-reviewer`) could have this hook's "go run the
 reviewers" note leak into their own supposedly-blinded context during a
 review, when the diff is by definition still unreviewed. Today's reviewers
 only have Read/Grep/Glob and can't trigger this hook regardless, but the

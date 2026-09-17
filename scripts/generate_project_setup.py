@@ -6,9 +6,11 @@ Given a TARGET project that has already been bootstrapped
 (`scripts/bootstrap.sh TARGET`) and structured interview answers, actually
 writes the tailored governance setup Phase 6a's `preview_project_setup.py`
 only ever previewed: copies the selected reviewer modules into
-`TARGET/.claude/agents/`, removes the bootstrap-default `cto-reviewer.md`
-(superseded by `platform-reviewer`, which is `applies_when: [always]` and
-therefore always selected), composes and writes a real
+`TARGET/.claude/agents/`, removes any leftover `cto-reviewer.md` from a
+project bootstrapped before this kit retired that legacy name (superseded by
+`platform-reviewer`, which is `applies_when: [always]` and therefore always
+selected — a fresh bootstrap ships that name directly and never creates the
+legacy file at all), composes and writes a real
 `TARGET/.claude/review_routing.json`, renders `TARGET/.claude/rules/guard-paths.md`
 from the template, and writes a starter `TARGET/README.md` if none exists.
 
@@ -133,11 +135,12 @@ _GUARD_PATHS_MARKER_RE = re.compile(
     re.escape(_GUARD_PATHS_MARKER_PREFIX) + r"([0-9a-f]{64})"
     + re.escape(_GUARD_PATHS_MARKER_SUFFIX) + r"\n\n")
 
-# bootstrap.sh ships this file into every project unconditionally, regardless
-# of stack — the exact "one overloaded generic reviewer" problem the module
-# library exists to fix. platform-reviewer (applies_when: [always], so always
-# selected) is its direct successor; generation removes only this one known
-# filename, never a glob.
+# A pre-rename bootstrap shipped this file into every project unconditionally,
+# regardless of stack — the exact "one overloaded generic reviewer" problem
+# the module library exists to fix. bootstrap.sh no longer ever creates it
+# (the kit's own copy is platform-reviewer.md now), so this only ever matches
+# a leftover from a project bootstrapped before that rename; generation
+# removes only this one known filename, never a glob.
 _LEGACY_REVIEWER_FILE = "cto-reviewer.md"
 
 
@@ -356,9 +359,9 @@ def generate(target: str, answers: SetupAnswers,
 
     routing_path = os.path.join(target, ".claude", "review_routing.json")
     # Deliberately overwrites bootstrap.sh's keep_file-preserved copy (this
-    # kit's own legacy, cto-reviewer-routed review_routing.json) — this is
-    # the one moment a project-specific config is meant to replace it. Safe
-    # here specifically because the force-check above already ran.
+    # kit's own shipped review_routing.json) — this is the one moment a
+    # project-specific config is meant to replace it. Safe here specifically
+    # because the force-check above already ran.
     compose_routing._write_atomic(
         routing_path, json.dumps(routing_preview, indent=2) + "\n")
     summary["review_routing_written"] = routing_path

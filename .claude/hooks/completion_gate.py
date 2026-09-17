@@ -55,7 +55,7 @@ _gate()'s cost at all.
 Explicitly skips subagent-issued tool calls (checks `agent_id`, present only
 when a hook fires inside a subagent call — see "common input fields" in
 Anthropic's hooks reference). This matters concretely for this repo's own
-blinded reviewers (scope-auditor, cto-reviewer): without this check, a
+blinded reviewers (scope-auditor, platform-reviewer): without this check, a
 Bash-capable future reviewer running mid-review — while the diff under
 review is, by definition, not yet reviewed — would have this hook's note
 ("...run the required reviewers and write .claude/task/review.md...")
