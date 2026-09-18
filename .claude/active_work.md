@@ -7,21 +7,18 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-Nothing is in flight. Owner confirmed 4 items to do before moving to the website-project test;
-the first 2 are merged —
-[MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31): (1)
-`templates/ci-audit/ci_automation_audit.py` is installed into a generated project's
-`.claude/hooks/` and idempotently wired as a `SessionStart` hook in `settings.json` whenever
-`/setup-project`'s interview is given a CI provider (`_prepare_ci_audit_hook_settings()` —
-validate-then-return-text, so every `GenerationRefused` still precedes the first write; refuses
-with a remedy on any unexpected `settings.json` shape); (2) `templates/*` is a guard path and the
-`guard-paths.md`/`review_routing.json` drift against the shipped platform-reviewer routing
-fragment is fixed. Review took 4 rounds (owner authorised one past the cap) — account in that
-merge's `.claude/task/contract.md` amendments.
+**Branch `research/parallel-session-worktree-audit` — committed, MR open on GitLab, awaiting
+owner merge.** Owner confirmed 4 items to do before moving to the website-project test; the
+first 2 merged in
+[MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31) (CI-audit
+hook wired into generated projects; `templates/*` guard path + routing/doc drift fix). This
+branch is item (3): `docs/decisions/parallel-sessions-use-worktrees.md` — doc-only ADR
+recommending one `git worktree` per concurrent session, every claim re-run live in a
+throwaway repo during the task (not carried over from earlier notes), plus a paragraph in
+`docs/project-kit-design.md`. No hook/script/test changes.
 
-Remaining two, in order: (3) write the worktree-safety ADR (research done, see "Next candidate
-work") — NOT STARTED; (4) scope the headless-mode audit — NOT STARTED. Then the website-project
-test.
+Remaining: (4) scope the headless-mode (`claude -p`) audit — NOT STARTED. Then the
+website-project test.
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
@@ -70,20 +67,6 @@ to any remote regardless).
 
 ## Next candidate work
 
-- **Parallel-session/worktree safety audit** — research done, ADR not yet written.
-  Branch `research/parallel-session-worktree-audit` exists with no commits; nothing is on
-  disk yet. Verified live (real tempdir repos + a real `git worktree`), not theorized:
-  - Worktrees are genuinely safe for parallel Claude Code sessions — separate index per
-    worktree, `commit_review_gate.py`'s diff-hash isolation holds, git itself refuses to
-    check out the same branch in two worktrees. **Recommendation the ADR should lead
-    with**: use worktrees for parallel sessions.
-  - Same directory, no worktree, is *mostly* safe: `commit_review_gate.py` recomputes the
-    diff hash fresh at commit time so nothing unreviewed slips through, but two sessions
-    can overwrite each other's `review.md` (forces a confusing but safe re-review), and
-    there's a narrow, real TOCTOU gap between hook approval and commit execution that a
-    `PreToolUse` hook can't close without OS-level locking (out of scope).
-  - Next step: write a short ADR matching the sandboxing ADR's shape, not yet confirmed
-    with the owner.
 - **Headless-mode (`claude -p`) compatibility audit** — not started. Last of the originally
   deferred hardening phases; gets its own task contract when picked up, or a "considered,
   not building" ADR if it turns out not worth it.

@@ -191,6 +191,17 @@ themselves rather than shipping on by default. See
 for the reasoning, including a real but partial synergy with this kit's own
 `guard-paths.md`.
 
+Running more than one Claude Code session on the same repo at once: use one
+`git worktree` per session. The index, branch, and `.claude/task/*` are
+per-worktree, so nothing one session stages or reviews can leak into
+another's commit; the one shared input is the base-branch ref, and a sibling
+merging the branch or rewriting `main` forces a re-review (a deny, never a
+bypass). In a single shared checkout the gate stays sound but the sessions
+overwrite each other's `review.md`, and there is a narrow
+approval-to-execution window it cannot close. See
+[`docs/decisions/parallel-sessions-use-worktrees.md`](decisions/parallel-sessions-use-worktrees.md)
+for what was actually run to establish that.
+
 ## Keeping a project up to date
 
 `bootstrap.sh` stamps `.claude/.kit-version` (this kit's own commit SHA) on
