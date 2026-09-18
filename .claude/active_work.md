@@ -7,8 +7,9 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-**Branch `feat/plugin-skeleton` — committed, MR open on GitLab, awaiting owner merge.**
-Phase 1 of 3 of turning the kit into a Claude Code plugin named `claude-project-kit`.
+Nothing is in flight. **Plugin phase 1 merged** —
+[MR !39](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/39). Phase 2 is
+next and is what unblocks the owner's website project.
 
 **Why (locked, don't re-litigate):** the website-project test — the kit's stated purpose, a new
 project set up from its own folder — failed on the first step: `/setup-project` only runs from
@@ -17,7 +18,7 @@ shape (AskUserQuestion: "Plugin (C)"), the name `claude-project-kit`, and hooks 
 in opted-in projects (marker: the project's `.claude/review_routing.json`). The owner's website
 project waits for phase 2 — do not set it up the old way.
 
-**Phase 1 (this branch):** `.claude-plugin/plugin.json` (components stay under `.claude/`;
+**Phase 1 (merged, MR !39):** `.claude-plugin/plugin.json` (components stay under `.claude/`;
 `agents`/`commands` must be file lists, not dirs — Claude Code rejects a dir); `.claude/hooks/hooks.json`
 mirrors `settings.json` via `${CLAUDE_PLUGIN_ROOT}` with a parity test; every hook short-circuits
 on `_command_utils.project_opted_in()`; `test_plugin_manifest.py` covers manifest, parity, and
