@@ -19,6 +19,9 @@ import os
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _command_utils import project_opted_in  # noqa: E402
+
 HANDOVER_REL = os.path.join(".claude", "active_work.md")
 
 MESSAGE = (
@@ -40,6 +43,8 @@ def main() -> int:
     try:
         event = json.loads(sys.stdin.read() or "{}")
     except Exception:
+        return 0
+    if not project_opted_in(event):
         return 0
     try:
         root = event.get("cwd") or os.getcwd()

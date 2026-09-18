@@ -37,6 +37,7 @@ from _command_utils import (  # noqa: E402
     emit_deny,
     git_subcommand,
     is_commit_subcommand,
+    project_opted_in,
     read_event,
     simple_commands,
     strip_quoted_and_heredoc,
@@ -166,7 +167,10 @@ def _pushes_protected(part: str, branch: str | None) -> bool:
 
 
 def main() -> int:
-    cmd = bash_command(read_event())
+    event = read_event()
+    if not project_opted_in(event):
+        return 0
+    cmd = bash_command(event)
     if not cmd:
         return 0
     parts = list(simple_commands(cmd))

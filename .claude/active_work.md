@@ -7,22 +7,40 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-Nothing is in flight. All 4 items the owner confirmed before the website-project test are
-merged: [MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31)
-(CI-audit hook wired into generated projects; `templates/*` guard path + drift fix),
-[MR !33](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/33) (worktree
-ADR — one `git worktree` per concurrent session), and
-[MR !37](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/37) (headless
-ADR — `docs/decisions/headless-mode-compatibility.md`: the gate holds under `claude -p` and
-`--dangerously-skip-permissions`, observed; `AskUserQuestion` isn't offered in `-p`; `--bare`
-is the documented off-switch and slated to become `-p`'s default). In between,
-[MR !35](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/35) fixed the
-review process (round-completeness rule + claims-against-source hunt item in every reviewer
-module; builder pre-spawn self-check; 3-round cap left as-is — **revisit only if branches keep
-hitting the cap**; the two branches since stayed within it).
+**Branch `feat/plugin-skeleton` — committed, MR open on GitLab, awaiting owner merge.**
+Phase 1 of 3 of turning the kit into a Claude Code plugin named `claude-project-kit`.
 
-**Next: the website-project test.** Not scoped — the owner names the project and what "test"
-means before anything is written; it gets its own contract.
+**Why (locked, don't re-litigate):** the website-project test — the kit's stated purpose, a new
+project set up from its own folder — failed on the first step: `/setup-project` only runs from
+a kit checkout. Owner rejected a path-stamp workaround ("just a hack") and chose the plugin
+shape (AskUserQuestion: "Plugin (C)"), the name `claude-project-kit`, and hooks that fire ONLY
+in opted-in projects (marker: the project's `.claude/review_routing.json`). The owner's website
+project waits for phase 2 — do not set it up the old way.
+
+**Phase 1 (this branch):** `.claude-plugin/plugin.json` (components stay under `.claude/`;
+`agents`/`commands` must be file lists, not dirs — Claude Code rejects a dir); `.claude/hooks/hooks.json`
+mirrors `settings.json` via `${CLAUDE_PLUGIN_ROOT}` with a parity test; every hook short-circuits
+on `_command_utils.project_opted_in()`; `test_plugin_manifest.py` covers manifest, parity, and
+silent-vs-speaking per hook. Verified live with `claude --plugin-dir <kit> -p` in a repo with no
+`.claude/`: plugin listed in `system/init`, commit ungated without the marker, denied with it.
+No hook decision logic changed; `bootstrap.sh` untouched (still works, now also copies the
+harmless `hooks.json`).
+
+**Phase 2 (next):** `/claude-project-kit:setup-project` — the existing skill already ships in the
+plugin under that name, but still refuses outside a kit checkout — runs from the target folder: absorbs
+`bootstrap.sh` (`git init` if needed, interview, preview, generate; writes only project-owned
+files, copies no hooks), retires `bootstrap.sh`, README quickstart rewritten for "new project,
+from its folder". Must reconcile agent namespacing: plugin agents are
+`claude-project-kit:scope-auditor` etc. while `review_routing.json`, `review.md` sections, the
+working agreement, and the skills say bare names — decide whether generated projects get
+project-level copies (bare names, override plugin ones) or routing learns the prefix.
+**Phase 3:** `marketplace.json` + `/plugin install` from the GitLab URL; migration for old-style
+projects (copied hooks + plugin hooks fire twice — `football-data-pipeline`, `dbt-agent-kit`);
+the kit governing itself while also installed as a plugin (same double-fire); ADR "plugin over
+bootstrap" superseding `minimal-version-stamp-vs-sync-mechanism.md`.
+
+Before this: all 4 pre-website items merged (MR !31 CI-audit wiring, !33 worktree ADR,
+!35 review-process fix, !37 headless ADR).
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
@@ -68,6 +86,13 @@ and `branch_discipline.py` blocks a direct `main` push to any remote regardless)
 
 ## Open owner decisions (none blocking, none scheduled)
 
+- **Plugin cost** (flagged by review on phase 1): as a plugin, every Bash call in every project
+  where the plugin is enabled spawns the six `PreToolUse(Bash)` hook processes, each of which
+  stats the marker and exits when not opted in. Fires only in set-up projects, as decided, but
+  LOADS everywhere. Whether that's acceptable, or whether a lighter first check is worth a
+  mechanism, is an owner call.
+- **`.claude-plugin/*` as a guard path?** The manifest decides what loads in every consumer
+  project and matches nothing in `review_routing.json` / `guard-paths.md`. Owner call.
 - **`--bare` will become `claude -p`'s default** (Anthropic docs, 2026-09-18). Bare mode skips
   hook loading, so a CI script following Anthropic's own examples runs with this kit's gate
   silently off. Whether that deserves a warning in `README.md` or in `/setup-project`'s
@@ -85,5 +110,5 @@ and `branch_discipline.py` blocks a direct `main` push to any remote regardless)
 
 ## Next candidate work
 
-- **Website-project test** — the owner's stated next step once the 4 pre-items were done.
-  Not scoped; gets its own contract.
+- **Plugin phase 2** (above) — then the owner's website project is set up from its folder as
+  the first real run.

@@ -46,6 +46,7 @@ from _command_utils import (  # noqa: E402
     emit_context,
     emit_deny,
     is_commit_subcommand,
+    project_opted_in,
     read_event,
     simple_commands,
 )
@@ -275,7 +276,10 @@ def main() -> int:
     if "--diff-hash" in sys.argv or "--staged-hash" in sys.argv:
         print(hashlib.sha256(_diff_to_hash(_repo_root())).hexdigest())
         return 0
-    cmd = bash_command(read_event())
+    event = read_event()
+    if not project_opted_in(event):
+        return 0
+    cmd = bash_command(event)
     if not cmd or not _is_commit(cmd):
         return 0
     root = _repo_root()

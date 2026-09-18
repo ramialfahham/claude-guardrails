@@ -20,6 +20,7 @@ from _command_utils import (  # noqa: E402
     bash_command,
     emit_context,
     git_subcommand,
+    project_opted_in,
     read_event,
     simple_commands,
 )
@@ -36,7 +37,10 @@ MESSAGE = (
 
 
 def main() -> int:
-    cmd = bash_command(read_event())
+    event = read_event()
+    if not project_opted_in(event):
+        return 0
+    cmd = bash_command(event)
     if not cmd:
         return 0
     for part in simple_commands(cmd):

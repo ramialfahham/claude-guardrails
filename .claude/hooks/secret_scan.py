@@ -26,6 +26,7 @@ from _command_utils import (  # noqa: E402
     bash_command,
     emit_deny,
     is_commit_subcommand,
+    project_opted_in,
     read_event,
     simple_commands,
 )
@@ -72,7 +73,10 @@ def _find_secrets(diff_text: str) -> list[str]:
 
 
 def main() -> int:
-    cmd = bash_command(read_event())
+    event = read_event()
+    if not project_opted_in(event):
+        return 0
+    cmd = bash_command(event)
     if not cmd or not _is_commit_command(cmd):
         return 0
     try:
