@@ -7,22 +7,21 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-**Branch `feat/ci-audit-wiring-and-guard-path-fixes` — committed, MR open on GitLab, awaiting
-owner merge** (both reviewers PASSed; opus `platform-reviewer` since guard paths were touched).
-Owner confirmed 4 items to do before moving to the website-project test — this branch covers
-the first 2, fully implemented and tested (full `.claude/tests/` suite green): (1)
-`templates/ci-audit/ci_automation_audit.py` is now installed into a generated project's
+Nothing is in flight. Owner confirmed 4 items to do before moving to the website-project test;
+the first 2 are merged —
+[MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31): (1)
+`templates/ci-audit/ci_automation_audit.py` is installed into a generated project's
 `.claude/hooks/` and idempotently wired as a `SessionStart` hook in `settings.json` whenever
-`/setup-project`'s interview is given a CI provider — via `_prepare_ci_audit_hook_settings()`
-(validate-then-return-text-to-write, never writes itself, so `generate()`'s "no
-`GenerationRefused` after the first write" invariant holds here too; raises loudly with a
-remedy on an unexpected `settings.json` shape rather than guessing); (2) `templates/*` is now
-a guard path, and the real drift between this kit's own `guard-paths.md`/`review_routing.json`
-and `templates/reviewers/routing/platform-reviewer.routing.json` (missing `.gitlab-ci.yml`,
-`package*.json`) is fixed — `test_routing_doc_parity.py` passes.
+`/setup-project`'s interview is given a CI provider (`_prepare_ci_audit_hook_settings()` —
+validate-then-return-text, so every `GenerationRefused` still precedes the first write; refuses
+with a remedy on any unexpected `settings.json` shape); (2) `templates/*` is a guard path and the
+`guard-paths.md`/`review_routing.json` drift against the shipped platform-reviewer routing
+fragment is fixed. Review took 4 rounds (owner authorised one past the cap) — account in that
+merge's `.claude/task/contract.md` amendments.
 
-(3) Write the worktree-safety ADR (research already done, see below) — NOT STARTED.
-(4) Scope the headless-mode audit — NOT STARTED. Neither is part of this branch.
+Remaining two, in order: (3) write the worktree-safety ADR (research done, see "Next candidate
+work") — NOT STARTED; (4) scope the headless-mode audit — NOT STARTED. Then the website-project
+test.
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
