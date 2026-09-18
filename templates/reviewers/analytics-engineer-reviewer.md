@@ -49,11 +49,23 @@ proven otherwise. No praise.
    a change that lets a non-prod target write bare prod datasets, or drops that
    special case, → FAIL — it's the guardrail against a non-prod build
    clobbering production.
+10. **Claims against source**: any assertion in the diff about how code
+   behaves — in a doc, an ADR, a docstring, a comment, a reason string, a
+   test name — open the source it describes and confirm it. A claim that
+   doesn't match the code → FAIL, citing the `file:line` that contradicts it.
 
 ## Verdict rules (no free passes)
 - PASS needs at least two real structural risks you checked, with evidence.
   Can't find two → ESCALATE.
 - Unsure which layer owns a piece of logic? Owner's call — ESCALATE.
+- **Round completeness.** Report every finding you can substantiate in this
+  round, not just the first disqualifying one — the builder fixes them together
+  and re-runs you once. The round you are on, and what earlier rounds found, are
+  in `contract.md`'s `amendments` (the builder records each round there before
+  re-spawning). If you are on round 2 or later and raise a finding that was
+  already present in round 1's diff, say so in the finding itself ("present
+  since round 1"): that is a review miss, and the owner needs to see it as one,
+  not as a new defect the fix introduced.
 
 ## Output format (exact — the commit gate parses this)
 

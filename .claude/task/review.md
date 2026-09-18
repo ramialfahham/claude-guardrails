@@ -1,48 +1,54 @@
 # Review
 
-diff_sha256: 0bd9082e245cf270125e681f3bb6e19e71a310a8bbc3dedbc7ca0e5b69aeed1c
+diff_sha256: 5d31f087f1d2e998b316ef2f49b35007c42fec0c6bb94061464f7d697f05faf4
 
-rounds: 4
+rounds: 3
 
-CPO ANSWER: round 3 (this repo's cap) FAILed on an enumeration error in the ADR (two blocking
-hooks named; `secret_scan.py` is a third). Owner authorised round 4 via `AskUserQuestion`
-("Yes, fix and run round 4") — see `.claude/task/contract.md`'s amendments for every round's
-findings and fixes. Round 4 (both reviewers) is clean.
+Within the cap. Round-by-round findings and fixes are in `.claude/task/contract.md`'s
+amendments. Round 2 was the first time the "Round completeness" rule this diff adds fired — the
+opus platform-reviewer labelled both of its own round-2 findings "present since round 1 — review
+miss", which is the behaviour the rule was written to produce.
 
 ## scope-auditor
-VERDICT: PASS (round 4, final)
+VERDICT: PASS (round 3, final)
 risks_checked:
-- Scope: the 3 non-bookkeeping changed files (new ADR, `docs/project-kit-design.md`,
-  `.claude/active_work.md`) plus the contract are all inside `scope_paths`; no hook, script,
-  template, or test changed — doc-only as the contract requires.
-- Reserved decisions respected: the ADR RECORDS the approval-to-execution gap and the
-  shared-base-ref behaviour; it does not propose a lock, a pre-commit hook, or any
-  bootstrap/setup-project enforcement as adopted. The past-the-cap round has a recorded owner
-  authority.
-- The "not covered" section distinguishes structural facts read from source (the hooks'
-  PreToolUse timing) from behavioural runs that were not done (`branch_discipline.py`,
-  `secret_scan.py` against a sibling worktree) — no claimed verification that didn't happen.
+- Scope: all changed files inside the contract's 13 `scope_paths`; no hook, script, or test-logic
+  change; `_ROUNDS_CAP` and the CPO ANSWER convention untouched; no hook enforcement of the new
+  rules added (both stay procedural, as the contract reserves).
+- Authority: the rule change is the owner's "now, go" on the post-MR !33 diagnosis (A + B now,
+  C deferred). Adding a "Claims against source" hunt item to every reviewer module — chosen in
+  round 2 over deleting an unbacked sentence — judged the authorised implementation of (B), not
+  a §6 rule extension. Replacing this branch's own never-released digests rather than
+  accumulating them is a plain application of the "never remove" rule's stated purpose
+  (protecting shipped defaults), not a reinterpretation.
+- Consistency: the "Round completeness" bullet and the "Claims against source" item are
+  textually identical across all 8 modules; both working agreements now state the same
+  self-check with the same claim-type list (round 1's FAIL, fixed).
 
 ## platform-reviewer
-VERDICT: PASS (round 4, final — sonnet; `docs/*` is not a guard path, reviewer spawned
-voluntarily because the ADR makes claims about hook behaviour)
+VERDICT: PASS (round 3, final — opus, guard paths touched: templates/*, .claude/agents/*)
 risks_checked:
-- Blocking-hook enumeration: grep of `emit_deny`/`permissionDecision` across `.claude/hooks/*.py`
-  — exactly `commit_review_gate.py`, `branch_discipline.py`, `secret_scan.py` call it;
-  `_command_utils.py` only defines it; `pre_push_gate.py`, `plan_implement_gate.py`,
-  `handover_in.py`, `handover_out.py` have no deny path. Matches the ADR.
-- "Stateless" for all three blocking hooks: `secret_scan.py` runs `git diff --staged` fresh each
-  time, no marker/tempfile; `branch_discipline.py` likewise. The two advisory hooks' marker
-  mechanisms are now described per hook (existence marker vs. last-reason hash) and neither
-  sets a `permissionDecision`.
-- Rows 7–10 (shared base-branch ref) mechanisms verified against `_base_ref`/`_merge_base`/
-  `_diff_to_hash`: fast-forward and past-fork-point amend leave the merge-base; merging the
-  branch moves it to the branch tip; amending the fork-point commit or replacing history moves
-  it back / removes it (staged-only fallback). "Always a deny, never a bypass" holds — only
-  byte-identical content reproduces a recorded SHA-256.
-- Approval-to-execution window described accurately for a `PreToolUse` hook, and its identical
-  shape in `secret_scan.py` now stated.
-- `docs/project-kit-design.md` paragraph agrees with the ADR; `.claude/active_work.md` accurate.
+- Every rule the diff adds names an input reviewers actually have: all 8 modules list
+  `.claude/task/contract.md` under `## Inputs`; `task/CONTRACT_TEMPLATE.md` defines
+  `amendments:` and `scripts/bootstrap.sh` ships that template, so the round-context reference
+  resolves in generated projects, not just here (round 2's finding 2, fixed).
+- "Reviewers are asked to check exactly this" is now backed by a numbered hunt item in all 8
+  modules, numbered max+1 per module; nothing in `scripts/` parses hunt-list numbering
+  (round 2's finding 1, fixed).
+- Kit/template byte-identity for `platform-reviewer.md` holds (identical blob ids before and
+  after in the patch).
+- Digest list: all pre-existing digests retained vs main, two appended; the parity test
+  `test_known_working_agreement_digests_lists_both_current_templates` runs fail-closed in both
+  CI configs. Reviewer could not hash the files itself (no shell) — builder ran the test:
+  passed, not skipped.
+- Step renumbering in §2 leaves no dangling "step N" reference anywhere in the repo; the new
+  bullet contains no `VERDICT:` line, so `commit_review_gate.py`'s parser is unaffected (it
+  parses `review.md`, not agent files, regardless).
+- Every behavioural claim in the diff checked against source (`_ROUNDS_CAP` at
+  `commit_review_gate.py:65`; `rounds:` in `task/REVIEW_TEMPLATE.md:18`; the ADR quote in
+  `active_work.md`; §2 section numbers) — all hold.
+- Non-blocking, left as-is: `_skeleton.md`'s "Keep the item below as-is" could read "renumber it
+  to follow your last item"; nothing parses the numbering.
 
-Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows) — a
-no-change sanity check, since the diff touches no code.
+Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows); the
+digest-parity test confirmed PASSED with `-rs`, not skipped.

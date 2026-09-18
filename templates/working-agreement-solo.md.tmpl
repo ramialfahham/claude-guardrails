@@ -26,12 +26,18 @@ say so rather than inventing a file to fill the gap.
 Before committing, run the review cycle (the commit gate enforces it):
 
 1. Stage everything (`git add`).
-2. Run the reviewers `.claude/review_routing.json` requires for the changed paths — cold,
-   read-only, adversarial.
-3. Write `.claude/task/review.md` (template: `task/REVIEW_TEMPLATE.md`) with each
+2. If the diff asserts how code behaves — in a doc, an ADR, a docstring, a comment, a
+   reason string, a test name — confirm each assertion against the source yourself before
+   spawning anyone, and be able to point at the `file:line`. Reviewers are asked to check
+   exactly this; every claim you didn't check is a review round you pay for.
+3. Run the reviewers `.claude/review_routing.json` requires for the changed paths — cold,
+   read-only, adversarial. Fix everything a round reports together, record the round's
+   findings and fixes in the contract's `amendments` (that's how a reviewer knows which
+   round it is on and what earlier rounds found), then re-run.
+4. Write `.claude/task/review.md` (template: `task/REVIEW_TEMPLATE.md`) with each
    reviewer's verdict and the diff hash (`python .claude/hooks/commit_review_gate.py
    --diff-hash`).
-4. `git commit` — blocked until the review matches the current cumulative diff, every
+5. `git commit` — blocked until the review matches the current cumulative diff, every
    required reviewer passed, and any escalation has a recorded answer.
 
 ## 3. Branches

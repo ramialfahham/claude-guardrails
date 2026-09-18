@@ -7,14 +7,23 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-Nothing is in flight. Owner confirmed 4 items to do before moving to the website-project test;
-3 of 4 are merged — [MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31)
-(CI-audit hook wired into generated projects; `templates/*` guard path + routing/doc drift fix)
-and [MR !33](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/33)
+**Branch `feat/review-round-completeness` — committed, MR open on GitLab, awaiting owner
+merge.** The review-process fix the owner chose ("now, go") after MR !33's diagnosis: (A) every
+reviewer module in `templates/reviewers/` and both `.claude/agents/*.md` now carry a
+"Round completeness" verdict rule — report every finding per round, and label a finding that
+was present in round 1's diff as a review miss; (B) both working agreements (§2) now make the
+builder check any claim about code behaviour against source before spawning reviewers, and
+fix a round's findings together; both new digests appended to
+`templates/known-working-agreement-digests.json`. (C) The 3-round cap is untouched on
+purpose — revisit only if A + B don't drop round counts. No hook/script/test-logic changes.
+
+Owner confirmed 4 items to do before moving to the website-project test; 3 of 4 are merged —
+[MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31) (CI-audit
+hook wired into generated projects; `templates/*` guard path + routing/doc drift fix) and
+[MR !33](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/33)
 (`docs/decisions/parallel-sessions-use-worktrees.md` — one `git worktree` per concurrent
 session; every claim run live; the shared base-branch ref can only ever force a spurious
-re-review, never a bypass). Both took 4 review rounds (owner authorised one past the cap each
-time) — accounts in those merges' `.claude/task/contract.md` amendments.
+re-review, never a bypass).
 
 Remaining: (4) scope the headless-mode (`claude -p`) audit — NOT STARTED. Then the
 website-project test.
@@ -58,18 +67,6 @@ to any remote regardless).
 
 ## Open owner decisions (none blocking, none scheduled)
 
-- **Review-process fix, proposed after MR !33, not yet decided.** Diagnosis from the last
-  three branches (12, 4, 4 rounds): (1) reviewer definitions never ask for an exhaustive
-  per-round finding list, so findings arrive serially — MR !33's round-3 finding was present
-  in round 1's diff; (2) nothing makes the builder check code-behaviour claims against source
-  before spawning reviewers; (3) the 3-round cap can't distinguish "design is wrong" (MR !28,
-  where it correctly forced a rebuild) from "findings arriving one per round" (!31, !33, where
-  it produced an `AskUserQuestion` for a two-line fix). Proposed: (A) a "round completeness"
-  rule in `templates/reviewers/*.md` + this kit's `.claude/agents/*` — list every finding; a
-  finding first raised in round N that existed in round 1's diff is labelled a reviewer defect;
-  (B) a builder pre-review self-check for claims about code behaviour (claim → `file:line`) in
-  the working agreement; (C) leave the cap at 3 until A+B show whether round counts drop.
-  Owner to decide whether/when — before or after item 4.
 - A generated project's routing (`templates/reviewers/routing/platform-reviewer.routing.json`
   + the empty `_BASE_ROUTING` in `scripts/preview_project_setup.py`) does not route edits to
   `.claude/settings.json` or `.claude/review_routing.json` to `platform-reviewer` — the very

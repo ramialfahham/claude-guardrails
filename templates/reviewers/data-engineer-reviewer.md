@@ -34,11 +34,23 @@ Treat every diff here as the next data incident until proven otherwise.
    raw table's grain, must state its downstream effect with evidence, not assert
    it. Missing → FAIL. A "messier old data → ingest less" framing without the
    offending-row count stated → FAIL.
+7. **Claims against source**: any assertion in the diff about how code
+   behaves — in a doc, an ADR, a docstring, a comment, a reason string, a
+   test name — open the source it describes and confirm it. A claim that
+   doesn't match the code → FAIL, citing the `file:line` that contradicts it.
 
 ## Verdict rules (no free passes)
 - PASS needs at least two real risks/edge cases you checked, with evidence.
   Can't find two → ESCALATE.
 - Ambiguous → ESCALATE.
+- **Round completeness.** Report every finding you can substantiate in this
+  round, not just the first disqualifying one — the builder fixes them together
+  and re-runs you once. The round you are on, and what earlier rounds found, are
+  in `contract.md`'s `amendments` (the builder records each round there before
+  re-spawning). If you are on round 2 or later and raise a finding that was
+  already present in round 1's diff, say so in the finding itself ("present
+  since round 1"): that is a review miss, and the owner needs to see it as one,
+  not as a new defect the fix introduced.
 
 ## Output format (exact — the commit gate parses this)
 
