@@ -107,6 +107,28 @@ your host system" — so this gap is lower-stakes than it might sound, but it
 is a real, named gap, not a confirmed guarantee this document is choosing to
 overstate.
 
+**Update, 2026-09-18 — this gap is now closed by the docs.** The hooks guide,
+under "Hooks and permission modes", now states it outright:
+
+> "`PreToolUse` hooks fire before any permission-mode check, in every
+> permission mode, including `dontAsk`. A hook that returns
+> `permissionDecision: "deny"` blocks the tool even in `bypassPermissions`
+> mode or with `--dangerously-skip-permissions`. This lets you enforce
+> policy that users can't bypass by changing their permission mode."
+> — `code.claude.com/docs/en/hooks-guide`, "Hooks and permission modes",
+> fetched and read directly on the date above
+
+So the inference the paragraph above declined to make is now a documented
+guarantee: this kit's `deny`-returning hooks hold under `bypassPermissions`
+too. (The "two enforcing hooks" count above was an omission when this was
+written: `secret_scan.py` already existed and also returns `deny`, so there
+are three. The count is left as written above; the guarantee and the
+reasoning apply to all three equally — each decides from repository state
+and none reads `permission_mode`.) The one documented way to switch them off
+is not a permission mode at all but `--bare`, which skips hook loading
+entirely — see
+[`headless-mode-compatibility.md`](headless-mode-compatibility.md).
+
 ## Consequences
 
 - This kit's two enforcing hooks do not need a "does this still work under
@@ -118,7 +140,6 @@ overstate.
   assume it still holds — the regression test named above exists
   specifically to force that re-verification rather than let it drift
   silently.
-- `bypassPermissions` compatibility is not asserted here; if this kit is ever
-  used in a context that relies on `bypassPermissions` mode specifically
-  (a container/VM with no interactive session), that assumption should be
-  checked directly rather than assumed from this document.
+- `bypassPermissions` compatibility was not asserted when this was first
+  written; as of the 2026-09-18 update above it is documented by Anthropic
+  (see `headless-mode-compatibility.md` for what was also run).

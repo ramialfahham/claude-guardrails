@@ -1,54 +1,48 @@
 # Review
 
-diff_sha256: 5d31f087f1d2e998b316ef2f49b35007c42fec0c6bb94061464f7d697f05faf4
+diff_sha256: 961538b5d7a739727e9352c0b3d8278d5a06e80ef45a5318b2058baed3661541
 
 rounds: 3
 
 Within the cap. Round-by-round findings and fixes are in `.claude/task/contract.md`'s
-amendments. Round 2 was the first time the "Round completeness" rule this diff adds fired — the
-opus platform-reviewer labelled both of its own round-2 findings "present since round 1 — review
-miss", which is the behaviour the rule was written to produce.
+amendments. Neither round's findings were carry-overs from round 1 — round 2's was introduced
+by round 1's own fix — so the "present since round 1" label never applied on this branch.
 
 ## scope-auditor
 VERDICT: PASS (round 3, final)
 risks_checked:
-- Scope: all changed files inside the contract's 13 `scope_paths`; no hook, script, or test-logic
-  change; `_ROUNDS_CAP` and the CPO ANSWER convention untouched; no hook enforcement of the new
-  rules added (both stay procedural, as the contract reserves).
-- Authority: the rule change is the owner's "now, go" on the post-MR !33 diagnosis (A + B now,
-  C deferred). Adding a "Claims against source" hunt item to every reviewer module — chosen in
-  round 2 over deleting an unbacked sentence — judged the authorised implementation of (B), not
-  a §6 rule extension. Replacing this branch's own never-released digests rather than
-  accumulating them is a plain application of the "never remove" rule's stated purpose
-  (protecting shipped defaults), not a reinterpretation.
-- Consistency: the "Round completeness" bullet and the "Claims against source" item are
-  textually identical across all 8 modules; both working agreements now state the same
-  self-check with the same claim-type list (round 1's FAIL, fixed).
+- Scope: all changed files inside the contract's 5 `scope_paths`; doc-only — no hook, script,
+  template, settings, or test change. The one gap found on the way (`_MODE_INDEPENDENT_HOOKS`
+  tripwire doesn't list `secret_scan`) was recorded in `active_work.md` as a follow-up, not
+  slipped in under a contract that forbids test changes.
+- Reserved decisions respected: the `--bare` default flip is recorded as an OPEN owner call; no
+  mitigation was chosen. Run 4's `--bare` auth failure is stated honestly in the ADR and the
+  contract; `done_when` judged met with that caveat recorded.
+- Claims against source: `/setup-project` step numbers (3, 3b, 6, 9 `AskUserQuestion`; 3b
+  fallback and 7 plain text), the three deny-capable hooks and their shared `PreToolUse(Bash)`
+  + `${CLAUDE_PROJECT_DIR}` wiring, and "none reads `permission_mode`" all verified against
+  `SKILL.md`, `settings.json`, and the hook sources.
 
 ## platform-reviewer
-VERDICT: PASS (round 3, final — opus, guard paths touched: templates/*, .claude/agents/*)
+VERDICT: PASS (round 3, final — sonnet; docs only, no guard path; spawned voluntarily because
+the ADR makes claims about hook behaviour)
 risks_checked:
-- Every rule the diff adds names an input reviewers actually have: all 8 modules list
-  `.claude/task/contract.md` under `## Inputs`; `task/CONTRACT_TEMPLATE.md` defines
-  `amendments:` and `scripts/bootstrap.sh` ships that template, so the round-context reference
-  resolves in generated projects, not just here (round 2's finding 2, fixed).
-- "Reviewers are asked to check exactly this" is now backed by a numbered hunt item in all 8
-  modules, numbered max+1 per module; nothing in `scripts/` parses hunt-list numbering
-  (round 2's finding 1, fixed).
-- Kit/template byte-identity for `platform-reviewer.md` holds (identical blob ids before and
-  after in the patch).
-- Digest list: all pre-existing digests retained vs main, two appended; the parity test
-  `test_known_working_agreement_digests_lists_both_current_templates` runs fail-closed in both
-  CI configs. Reviewer could not hash the files itself (no shell) — builder ran the test:
-  passed, not skipped.
-- Step renumbering in §2 leaves no dangling "step N" reference anywhere in the repo; the new
-  bullet contains no `VERDICT:` line, so `commit_review_gate.py`'s parser is unaffected (it
-  parses `review.md`, not agent files, regardless).
-- Every behavioural claim in the diff checked against source (`_ROUNDS_CAP` at
-  `commit_review_gate.py:65`; `rounds:` in `task/REVIEW_TEMPLATE.md:18`; the ADR quote in
-  `active_work.md`; §2 section numbers) — all hold.
-- Non-blocking, left as-is: `_skeleton.md`'s "Keep the item below as-is" could read "renumber it
-  to follow your last item"; nothing parses the numbering.
+- Round 2's fix: `.claude/tests/test_hooks_import.py:52` lists exactly
+  `commit_review_gate`, `branch_discipline`, `completion_gate`; the contract amendment now
+  says so and the false "already lists `secret_scan`" claim is gone; no test file in the patch.
+- Every claim about this kit's own files, against source: the three hooks' `deny` calls and
+  wiring; run 1's quoted gate message matches `commit_review_gate.py:231` verbatim; `SKILL.md`
+  step classifications; `handover_plan_gate.py`/`plan_implement_gate.py` emit only
+  `additionalContext`; `handover_in.py` is the `SessionStart` hook. All hold.
+- Conclusion 1 no longer overreaches: the observed `deny` is attributed to
+  `commit_review_gate.py` (runs 1, 3, 6); `branch_discipline.py` and `secret_scan.py` are
+  stated as inference from shared wiring, consistent with "What this does NOT cover".
+- The auto-mode ADR's update block makes no dating claim (a first draft's false "predates" was
+  caught and removed before round 2).
+- Anthropic doc quotes could not be re-fetched by the reviewer (no fetch tool); the builder
+  fetched and grepped each cited page directly in-session, and replaced one research-agent
+  paraphrase with the page's actual sentences before round 1.
+- No new mechanism, dependency, credential, or CI change.
 
-Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows); the
-digest-parity test confirmed PASSED with `-rs`, not skipped.
+Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows) — a
+no-change sanity check, since the diff touches no code.

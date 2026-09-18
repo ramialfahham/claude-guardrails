@@ -1,9 +1,10 @@
 # Task contract
 
-objective: Cut serial review rounds — (A) require reviewers to report every finding per round
-and to label a finding that was present in round 1's diff as a review miss; (B) require the
-builder to check any claim about code behaviour against source before spawning reviewers.
-The 3-round cap is deliberately untouched.
+objective: Audit whether this kit's enforcement and workflow hold under Claude Code's headless
+mode (`claude -p`) and the Agent SDK — record the documented facts, verify the load-bearing
+undocumented ones by actually running `claude -p` against a throwaway bootstrapped repo, and
+write the result up as an ADR; amend the auto-mode ADR's "not confirmed" section now that the
+docs state a hook `deny` survives `bypassPermissions`.
 
 tracking_issue: (none — this repo doesn't use an issue tracker for its own work yet;
 `.claude/active_work.md` is the handover mechanism instead)
@@ -11,60 +12,59 @@ tracking_issue: (none — this repo doesn't use an issue tracker for its own wor
 scope_paths:
   - .claude/task/contract.md
   - .claude/active_work.md
-  - templates/reviewers/_skeleton.md
-  - templates/reviewers/analytics-engineer-reviewer.md
-  - templates/reviewers/data-engineer-reviewer.md
-  - templates/reviewers/frontend-reviewer.md
-  - templates/reviewers/platform-reviewer.md
-  - templates/reviewers/security-reviewer.md
-  - .claude/agents/platform-reviewer.md
-  - .claude/agents/scope-auditor.md
-  - .claude/working-agreement.md
-  - templates/working-agreement-solo.md.tmpl
-  - templates/known-working-agreement-digests.json
+  - docs/decisions/headless-mode-compatibility.md
+  - docs/decisions/auto-mode-and-bypass-compatibility.md
+  - docs/project-kit-design.md
 
 decisions_reserved:
-  - Whether to change the review process at all, and which of the three diagnosed causes to
-    act on — owner chose "now, go" on the proposal (A + B now, C: leave the cap at 3 until
-    A + B show whether round counts drop) after the diagnosis was laid out following MR !33.
-  - The cap itself (`_ROUNDS_CAP` in `commit_review_gate.py`, its meaning, or the CPO ANSWER
-    convention) — explicitly NOT changed here.
-  - Any hook enforcement of A or B — not built; both are procedural rules, same status as
-    `guard-paths.md`'s opus convention. Whether to mechanise them later is an owner call.
+  - Whether to do this at all and in which shape — owner chose "go" on the proposed scope (live
+    runs + new ADR + one-paragraph amendment to the auto-mode ADR; doc-only) over a docs-only
+    ADR or a "considered, not building" ADR, after the documented facts were laid out.
+  - Any hook, script, template, or settings change — NOT in scope. If a live run shows a hook
+    does not fire or `CLAUDE_PROJECT_DIR` does not resolve headless, that is recorded as a
+    finding and gets its own contract; it is not fixed here.
+  - Whether `--bare` (documented: skips hooks) or SDK `settingSources` opt-out warrant any
+    mitigation (a README warning, a generated-project note, anything else) — recorded as an
+    open owner call, not decided.
 
 done_when:
-  - Every reviewer module in `templates/reviewers/` (skeleton included) and both of this kit's
-    own `.claude/agents/*.md` carry the same round-completeness rule under "Verdict rules";
-    `.claude/agents/platform-reviewer.md` remains byte-identical to its template.
-  - `.claude/working-agreement.md` §2 and `templates/working-agreement-solo.md.tmpl` §2 carry
-    the builder pre-spawn self-check; both new digests are appended to
-    `templates/known-working-agreement-digests.json` (never removing old ones).
-  - No hook, script, or test-logic changes.
-  - Full test suite (`.claude/tests/`) passes — the digest-parity and routing-doc-parity tests
-    are the ones this diff can break.
+  - `docs/decisions/headless-mode-compatibility.md` exists, in this repo's ADR shape, and every
+    behavioural claim in it is either a direct doc quote with its URL or something observed in a
+    `claude -p` run during this task — with the exact command and the relevant output recorded.
+  - The live runs cover at least: hooks fire headless (SessionStart context present; a commit
+    without `review.md` denied) — which is also the `CLAUDE_PROJECT_DIR` check; a commit under
+    `--dangerously-skip-permissions` still denied; `--bare` skips the hooks; what the model does
+    when pushed to `AskUserQuestion` in `-p`.
+  - `docs/decisions/auto-mode-and-bypass-compatibility.md`'s "What is NOT confirmed" section is
+    amended with the now-documented `bypassPermissions` quote and URL, without rewriting the rest.
+  - `docs/project-kit-design.md` links the new ADR from the hardening section.
+  - No hook, script, template, settings, or test changes; full suite still passes.
 
 amendments:
-  - 2026-09-18 — round 1: platform-reviewer (opus) PASSed; scope-auditor FAILed on one finding —
-    the solo working agreement's copy of the self-check listed fewer claim types ("ADR", "test
-    name" missing) than the standard one, i.e. a different rule, not a lighter statement of the
-    same one. Fixed: solo now states the same rule with the same list. Also taken from the
-    platform-reviewer's non-blocking note: "Reviewers will check exactly this" was itself an
-    unbacked behaviour claim (no reviewer module has an explicit claims-vs-source hunt item) —
-    softened to "are asked to" in both files. The two digests appended earlier on this branch
-    were never released, so they were replaced rather than accumulated (the "never remove"
-    rule protects shipped defaults an older target may hold; these had shipped nowhere).
-  - 2026-09-18 — round 2: scope-auditor PASSed; platform-reviewer (opus) FAILed on two findings,
-    BOTH self-labelled "present since round 1 — review miss" under the rule this very diff adds
-    (the first time the rule has fired, and on its own author). Both fixed:
-    1. "Reviewers are asked to check exactly this" was still unbacked — no reviewer module had a
-       claims-vs-source hunt item, so the verb change in round 1 fixed nothing. Fixed by making
-       it true: every module (skeleton included, with a keep-this-item note) gained a numbered
-       hunt item "Claims against source" — confirm any behaviour assertion in the diff against
-       the code it describes; mismatch → FAIL with the contradicting `file:line`. Chosen over
-       dropping the sentence because it's the half of (B) that actually closes the loop.
-    2. The "present since round 1" half of (A) depended on an input reviewers aren't given (the
-       round number and round 1's findings live in `review.md`, which they don't read). Fixed
-       using an input they already have: the bullet now says both are in `contract.md`'s
-       `amendments`, and step 3 of both working agreements tells the builder to record each
-       round there before re-spawning — the convention this repo already follows by hand.
-    Digests refreshed again (same unreleased-replacement reasoning as round 1).
+  - 2026-09-18 — round 1: scope-auditor PASSed (judged run 4's `--bare` auth failure honestly
+    recorded and `done_when` met); platform-reviewer (sonnet, spawned voluntarily — docs only)
+    FAILed on three claims-against-source findings, all real, all fixed:
+    1. "`/setup-project`'s interview is `AskUserQuestion` throughout" — false: `SKILL.md` steps
+       3b-fallback and 7 are explicit plain-text questions. Reworded to name both kinds; the
+       conclusion (can't run headless) stands on either.
+    2. Conclusion 1 said "all three blocking hooks … nothing weakens them" while the doc's own
+       not-covered list admitted only `commit_review_gate.py` was pushed to deny. Reworded: the
+       review gate is observed; the other two are inference from shared wiring, stated as such.
+    3. The auto-mode ADR's pre-existing "two enforcing hooks" count omits `secret_scan.py`; this
+       diff touched that file without reconciling it. Added a parenthetical in the dated update
+       block. First draft of that note said the count "predates `secret_scan.py`" — checked
+       with `git log --diff-filter=A`: secret_scan.py (2026-09-06) predates the ADR
+       (2026-09-11), so it was an omission, not a timing artefact; corrected before spawning
+       round 2. Also verified none of the three reads `permission_mode`.
+  - 2026-09-18 — round 2: scope-auditor PASSed; platform-reviewer FAILed on one new defect in
+    round 1's own amendment text: it claimed `test_gate_hooks_never_branch_on_permission_mode`
+    "already lists `secret_scan`" — false. A grep for `secret_scan` in `test_hooks_import.py` hit
+    the importability list (line 28), which I read as the tripwire's `_MODE_INDEPENDENT_HOOKS`
+    list (line 52: `commit_review_gate`, `branch_discipline`, `completion_gate` only). The
+    shipped ADR text never made that claim; the audit trail did. Fixed: claim removed. Adding
+    `secret_scan` to the tripwire list is a one-line test change — out of this contract's scope
+    (no test changes), recorded in `active_work.md` as a follow-up instead of slipped in.
+    Note for reviewers: `review_input.patch` excludes `.claude/task/*` by design (the commit
+    gate's hash excludes it too); `contract.md` is read from disk, as the reviewer did.
+    The research agent's Agent SDK "quote" turned out to be a paraphrase — caught by fetching
+    the page myself under rule B before round 1; replaced with the page's actual sentences.

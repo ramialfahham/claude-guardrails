@@ -7,27 +7,23 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-Nothing is in flight. Most recent merge —
+**Branch `research/headless-mode-audit` — committed, MR open on GitLab, awaiting owner
+merge.** Item 4 of the owner's 4: `docs/decisions/headless-mode-compatibility.md`, doc-only.
+Six `claude -p` runs against a throwaway bootstrapped repo (v2.1.223, haiku): the review gate
+denies an unreviewed commit headless, denies it under `--dangerously-skip-permissions`, and
+allows it with a valid `review.md`; `SessionStart` injects the handover (so
+`${CLAUDE_PROJECT_DIR}` resolves); `AskUserQuestion` is not offered in `-p` at all. `--bare`
+(documented: skips hooks; needs `ANTHROPIC_API_KEY`, not OAuth) could not be run here. Also
+amends `auto-mode-and-bypass-compatibility.md`: its "not confirmed" bypass gap is now closed
+by a direct doc quote. No hook/script/test changes.
+
+Most recent merge before that —
 [MR !35](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/35): the
-review-process fix chosen after MR !33's diagnosis. (A) every reviewer module in
-`templates/reviewers/` and both `.claude/agents/*.md` carry a "Round completeness" verdict rule
-(report every finding per round; a finding present since round 1 is labelled a review miss —
-round context comes from the contract's `amendments`) and a "Claims against source" hunt item;
-(B) both working agreements §2 make the builder check code-behaviour claims against source
-before spawning and record each round in the contract before re-spawning; (C) the 3-round cap
-is untouched on purpose — **revisit only if the next branches still hit the cap.** MR !35
-itself took 3 rounds, within the cap, and the new rule fired on its own author in round 2.
+review-process fix (round-completeness rule + claims-against-source hunt item in every
+reviewer module; builder pre-spawn self-check in both working agreements; 3-round cap left
+as-is — **revisit only if branches keep hitting the cap**).
 
-Owner confirmed 4 items to do before moving to the website-project test; 3 of 4 are merged —
-[MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31) (CI-audit
-hook wired into generated projects; `templates/*` guard path + routing/doc drift fix) and
-[MR !33](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/33)
-(`docs/decisions/parallel-sessions-use-worktrees.md` — one `git worktree` per concurrent
-session; every claim run live; the shared base-branch ref can only ever force a spurious
-re-review, never a bypass).
-
-Remaining: (4) scope the headless-mode (`claude -p`) audit — NOT STARTED. Then the
-website-project test.
+All 4 pre-website items are now done or in review. Next: the website-project test.
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
@@ -73,6 +69,15 @@ and `branch_discipline.py` blocks a direct `main` push to any remote regardless)
 
 ## Open owner decisions (none blocking, none scheduled)
 
+- **`--bare` will become `claude -p`'s default** (Anthropic docs, 2026-09-18). Bare mode skips
+  hook loading, so a CI script following Anthropic's own examples runs with this kit's gate
+  silently off. Whether that deserves a warning in `README.md` or in `/setup-project`'s
+  output is an owner call — flagged by the headless-mode ADR, not acted on.
+- **One-line test follow-up**: `.claude/tests/test_hooks_import.py`'s `_MODE_INDEPENDENT_HOOKS`
+  tripwire lists `commit_review_gate`, `branch_discipline`, `completion_gate` but not
+  `secret_scan`, the third `deny`-capable hook — so nothing catches `secret_scan.py` ever
+  branching on `permission_mode`, which the auto-mode ADR's update now says it doesn't. Found
+  during the headless-mode audit; deliberately not changed on that doc-only branch.
 - A generated project's routing (`templates/reviewers/routing/platform-reviewer.routing.json`
   + the empty `_BASE_ROUTING` in `scripts/preview_project_setup.py`) does not route edits to
   `.claude/settings.json` or `.claude/review_routing.json` to `platform-reviewer` — the very
@@ -81,6 +86,5 @@ and `branch_discipline.py` blocks a direct `main` push to any remote regardless)
 
 ## Next candidate work
 
-- **Headless-mode (`claude -p`) compatibility audit** — not started. Last of the originally
-  deferred hardening phases; gets its own task contract when picked up, or a "considered,
-  not building" ADR if it turns out not worth it.
+- **Website-project test** — the owner's stated next step once the 4 pre-items were done.
+  Not scoped; gets its own contract.
