@@ -319,12 +319,15 @@ def build_preview(answers: SetupAnswers) -> dict:
         "guard_paths_preview": build_guard_paths_preview(routing_preview),
         "escalations": build_escalations(answers),
         "ci_provider_note": (
-            "CI provider recorded for later use — it does not change which "
-            "reviewer modules are selected today (the shipped routing "
+            "Generation will install templates/ci-audit/ci_automation_audit.py "
+            "into .claude/hooks/ and wire it as a SessionStart hook — an "
+            "advisory-only scan for a workflow that combines a schedule/"
+            "dispatch trigger with an auto-merge action. Does not change "
+            "which reviewer modules are selected (the shipped routing "
             "fragments already cover both GitHub and GitLab paths)."
             if answers.ci_provider != "none" else
-            "No CI provider given — static-scan/live-check template wiring "
-            "(a later phase) will need one."
+            "No CI provider given — the CI-automation-audit hook needs one "
+            "to install, so nothing is wired for this project."
         ),
         "tracker_provider_note": (
             f"Roadmap tracking will point at "

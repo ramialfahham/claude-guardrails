@@ -7,7 +7,22 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-All planned work is merged to `main`. Nothing is in flight.
+**Branch `feat/ci-audit-wiring-and-guard-path-fixes` — committed, MR open on GitLab, awaiting
+owner merge** (both reviewers PASSed; opus `platform-reviewer` since guard paths were touched).
+Owner confirmed 4 items to do before moving to the website-project test — this branch covers
+the first 2, fully implemented and tested (full `.claude/tests/` suite green): (1)
+`templates/ci-audit/ci_automation_audit.py` is now installed into a generated project's
+`.claude/hooks/` and idempotently wired as a `SessionStart` hook in `settings.json` whenever
+`/setup-project`'s interview is given a CI provider — via `_prepare_ci_audit_hook_settings()`
+(validate-then-return-text-to-write, never writes itself, so `generate()`'s "no
+`GenerationRefused` after the first write" invariant holds here too; raises loudly with a
+remedy on an unexpected `settings.json` shape rather than guessing); (2) `templates/*` is now
+a guard path, and the real drift between this kit's own `guard-paths.md`/`review_routing.json`
+and `templates/reviewers/routing/platform-reviewer.routing.json` (missing `.gitlab-ci.yml`,
+`package*.json`) is fixed — `test_routing_doc_parity.py` passes.
+
+(3) Write the worktree-safety ADR (research already done, see below) — NOT STARTED.
+(4) Scope the headless-mode audit — NOT STARTED. Neither is part of this branch.
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
@@ -48,14 +63,11 @@ to any remote regardless).
 
 ## Open owner decisions (none blocking, none scheduled)
 
-- Whether/how to wire `templates/ci-audit/ci_automation_audit.py` as an actual
-  `SessionStart` hook anywhere (currently inert everywhere, by design).
-- Whether `templates/*` should be its own guard path in `review_routing.json`/
-  `.claude/rules/guard-paths.md` (flagged end of Phase 5, still undecided).
-- Drift between this kit's own hand-maintained `.claude/rules/guard-paths.md` and
-  `templates/reviewers/routing/platform-reviewer.routing.json` — Phase 6b's generation
-  logic avoids introducing this drift into *new* projects, but doesn't fix this kit's own
-  existing copy.
+- A generated project's routing (`templates/reviewers/routing/platform-reviewer.routing.json`
+  + the empty `_BASE_ROUTING` in `scripts/preview_project_setup.py`) does not route edits to
+  `.claude/settings.json` or `.claude/review_routing.json` to `platform-reviewer` — the very
+  file `generate()` now writes into. This kit's own routing does. Flagged by review on the
+  CI-audit wiring branch; whether to close that gap is a follow-up owner call.
 
 ## Next candidate work
 
