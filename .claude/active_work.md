@@ -7,17 +7,20 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-One thing in flight: [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28)
-(`feat/tracker-convention-and-process-tier`) — a tracker-based roadmap convention (roadmap is
-the tracker's issues/milestones, never a markdown file, generalizing `football-data-pipeline`'s
-own real fix) plus a Solo/Standard process-tier question in `/setup-project`'s interview.
-Reviewed clean (`scope-auditor` PASS, `platform-reviewer` PASS at opus) after 12 review rounds
-— 3 past this repo's cap, owner-authorized to rebuild the tier-recognition mechanism from a
-git-history reconstruction (had a real coupling bug with `bootstrap.sh`'s own conventions) onto
-a static digest list. Full account in that branch's `.claude/task/contract.md`. Pushed,
-awaiting owner merge.
+All planned work is merged to `main`. Nothing is in flight.
 
-Otherwise, all prior planned work is merged to `main`. This repo was renamed
+`/setup-project`'s interview now asks two more questions:
+[MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
+tracker-based roadmap convention (roadmap is the tracker's issues/milestones, never a markdown
+file — generalizes `football-data-pipeline`'s own real fix) and a Solo/Standard process-tier
+question controlling how much process a generated project's `working-agreement.md` enforces.
+Tier/hand-customization recognition is a static digest list
+(`templates/known-working-agreement-digests.json`), not a git-history reconstruction — an
+earlier design tried that and review (12 rounds, 3 past this repo's cap, owner-authorized
+rebuild) found a real coupling bug with `bootstrap.sh`'s own conventions. Full account in
+`main`'s `.claude/task/contract.md` history for that merge.
+
+Also merged in the same wave: this repo was renamed
 `claude-guardrails` → `claude-project-kit` (`rami.al-fahham/claude-project-kit` on GitLab;
 local `gitlab` remote repointed), and this kit's own self-governance reviewer,
 `.claude/agents/cto-reviewer.md`, was retired in favor of using
