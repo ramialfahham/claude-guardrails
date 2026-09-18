@@ -39,12 +39,21 @@ tracker, say so explicitly rather than inventing a file to fill the gap.
 Before committing, run the review cycle (the commit gate enforces it):
 
 1. Stage everything (`git add`).
-2. Run the reviewers the routing requires (`.claude/review_routing.json`) against the
+2. **Check your own claims first.** If the diff asserts how code behaves — in a doc, an
+   ADR, a docstring, a comment, a reason string, a test name — open the source and confirm
+   each assertion against it before spawning anyone, and be able to point at the
+   `file:line`. Reviewers are asked to check exactly this; every claim you didn't check
+   yourself is a review round you pay for.
+3. Run the reviewers the routing requires (`.claude/review_routing.json`) against the
    cumulative branch diff (everything committed since the branch split from `main`,
-   plus what's staged now) — cold, read-only, adversarial.
-3. Write `.claude/task/review.md` (template: `REVIEW_TEMPLATE.md`) with each reviewer's
+   plus what's staged now) — cold, read-only, adversarial. Fix everything a round
+   reports together, record that round's findings and fixes in the contract's
+   `amendments`, then re-run — that log is how a reviewer knows which round it is on
+   and what earlier rounds found, and reviewers are asked to report every finding per
+   round, not the first one, so one round's list is meant to be complete.
+4. Write `.claude/task/review.md` (template: `REVIEW_TEMPLATE.md`) with each reviewer's
    verdict and the diff hash (`python .claude/hooks/commit_review_gate.py --diff-hash`).
-4. `git commit` — blocked until the review matches the branch's current cumulative
+5. `git commit` — blocked until the review matches the branch's current cumulative
    diff, every required reviewer passed, and any escalation has a recorded answer.
 
 Trace before you change a shared interface or module: know what depends on it first.

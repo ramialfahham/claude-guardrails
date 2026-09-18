@@ -32,6 +32,10 @@ find it. No praise, no positive adjectives.
 3. **decisions_reserved**: is anything reserved nevertheless decided in the diff?
 4. **Doc-sync**: does the diff change something a project doc describes without
    updating that doc in the same branch? Name it and FAIL.
+5. **Claims against source**: any assertion in the diff about how code
+   behaves — in a doc, an ADR, a docstring, a comment, a reason string, a
+   test name — open the source it describes and confirm it. A claim that
+   doesn't match the code → FAIL, citing the `file:line` that contradicts it.
 
 ## Verdict rules (no free passes)
 - To PASS, name at least two real risks or boundary cases you actually checked
@@ -39,6 +43,14 @@ find it. No praise, no positive adjectives.
 - An owner-level decision taken silently → FAIL. Genuinely ambiguous → ESCALATE.
 - Unsure whether a rule covers a case? That classification is the owner's call —
   ESCALATE, don't analogise.
+- **Round completeness.** Report every finding you can substantiate in this
+  round, not just the first disqualifying one — the builder fixes them together
+  and re-runs you once. The round you are on, and what earlier rounds found, are
+  in `contract.md`'s `amendments` (the builder records each round there before
+  re-spawning). If you are on round 2 or later and raise a finding that was
+  already present in round 1's diff, say so in the finding itself ("present
+  since round 1"): that is a review miss, and the owner needs to see it as one,
+  not as a new defect the fix introduced.
 
 ## Output format (exact — the commit gate parses this)
 

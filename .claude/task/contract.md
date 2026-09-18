@@ -1,8 +1,9 @@
 # Task contract
 
-objective: Write the parallel-session/worktree safety ADR — record, with live evidence, whether
-this kit's review gate holds when more than one Claude Code session works on the same repo at
-once, and recommend `git worktree` for that case.
+objective: Cut serial review rounds — (A) require reviewers to report every finding per round
+and to label a finding that was present in round 1's diff as a review miss; (B) require the
+builder to check any claim about code behaviour against source before spawning reviewers.
+The 3-round cap is deliberately untouched.
 
 tracking_issue: (none — this repo doesn't use an issue tracker for its own work yet;
 `.claude/active_work.md` is the handover mechanism instead)
@@ -10,71 +11,60 @@ tracking_issue: (none — this repo doesn't use an issue tracker for its own wor
 scope_paths:
   - .claude/task/contract.md
   - .claude/active_work.md
-  - docs/decisions/parallel-sessions-use-worktrees.md
-  - docs/project-kit-design.md
+  - templates/reviewers/_skeleton.md
+  - templates/reviewers/analytics-engineer-reviewer.md
+  - templates/reviewers/data-engineer-reviewer.md
+  - templates/reviewers/frontend-reviewer.md
+  - templates/reviewers/platform-reviewer.md
+  - templates/reviewers/security-reviewer.md
+  - .claude/agents/platform-reviewer.md
+  - .claude/agents/scope-auditor.md
+  - .claude/working-agreement.md
+  - templates/working-agreement-solo.md.tmpl
+  - templates/known-working-agreement-digests.json
 
 decisions_reserved:
-  - Whether to write this at all — owner selected "Write the worktree-safety ADR" via
-    AskUserQuestion as item 3 of 4, and gave "go" after a plain-language restatement of the
-    ADR's scope (doc-only, leads with the worktree recommendation, records the same-directory
-    caveats, no hook changes).
-  - Anything that would close the same-directory TOCTOU gap (OS-level locking, a new hook, a
-    change to `commit_review_gate.py`) — explicitly NOT in scope; the ADR records it as a known
-    limit for the owner to decide on separately, if ever.
-  - Whether the recommendation becomes something `bootstrap.sh` or `/setup-project` prints or
-    enforces — not decided here; the ADR is documentation only.
+  - Whether to change the review process at all, and which of the three diagnosed causes to
+    act on — owner chose "now, go" on the proposal (A + B now, C: leave the cap at 3 until
+    A + B show whether round counts drop) after the diagnosis was laid out following MR !33.
+  - The cap itself (`_ROUNDS_CAP` in `commit_review_gate.py`, its meaning, or the CPO ANSWER
+    convention) — explicitly NOT changed here.
+  - Any hook enforcement of A or B — not built; both are procedural rules, same status as
+    `guard-paths.md`'s opus convention. Whether to mechanise them later is an owner call.
 
 done_when:
-  - `docs/decisions/parallel-sessions-use-worktrees.md` exists, matches the shape of this repo's
-    other ADRs (Status / Context / Decision / Why / what is NOT covered / Consequences), and
-    every behavioural claim in it was reproduced by actually running it in a throwaway repo
-    during this task — not carried over from an earlier session's notes.
-  - `docs/project-kit-design.md` links to it from the hardening section, next to the sandboxing
-    ADR.
-  - No code, hook, template, or test changes.
-  - Full test suite (`.claude/tests/`) still passes (nothing should have changed — a sanity check
-    that nothing did).
+  - Every reviewer module in `templates/reviewers/` (skeleton included) and both of this kit's
+    own `.claude/agents/*.md` carry the same round-completeness rule under "Verdict rules";
+    `.claude/agents/platform-reviewer.md` remains byte-identical to its template.
+  - `.claude/working-agreement.md` §2 and `templates/working-agreement-solo.md.tmpl` §2 carry
+    the builder pre-spawn self-check; both new digests are appended to
+    `templates/known-working-agreement-digests.json` (never removing old ones).
+  - No hook, script, or test-logic changes.
+  - Full test suite (`.claude/tests/`) passes — the digest-parity and routing-doc-parity tests
+    are the ones this diff can break.
 
 amendments:
-  - 2026-09-18 — platform-reviewer's first pass (sonnet, spawned voluntarily — `docs/*` isn't
-    routed to it — because the ADR makes claims about hook behaviour) FAILed on two findings;
-    scope-auditor PASSed. Both were real and both fixed:
-    1. The ADR's central sentence — "nothing the gate relies on lives in the shared `.git`" —
-       was false: the base-branch ref `commit_review_gate.py` uses for the merge-base is shared
-       across worktrees. The first draft inferred this from git's model and presented it as
-       observed. Fixed by actually running it (rows 7–10): a sibling fast-forwarding or amending
-       `main` leaves the hash unchanged; merging the branch into `main` or rewriting `main`'s
-       history changes it — always as a spurious deny, never a bypass. ADR argument and the
-       `docs/project-kit-design.md` paragraph rewritten to say exactly that.
-    2. "Stateless" was claimed for `completion_gate.py`, which (like `handover_plan_gate.py`,
-       previously unmentioned) keeps a session-keyed marker in the OS temp dir. Fixed: the ADR
-       now distinguishes the two blocking hooks (stateless) from the two advisory ones (marker
-       state, never a `permissionDecision`).
-    The first re-run of row 9/10's check was itself invalid (a scripted edit adding the branch
-    commit silently failed to apply, so "cumulative" and "staged-only" coincided and every case
-    read UNCHANGED); caught by noticing the hash was byte-identical to a different fixture's,
-    fixed, re-run. Noted here because it's the same trap the ADR warns about — an "observation"
-    that observed nothing.
-  - 2026-09-18 — platform-reviewer's second pass (sonnet, round 2) FAILed on two more claims,
-    scope-auditor PASSed. Both real, both fixed:
-    1. Round 1's fix said both advisory hooks fire "once per session". True for
-       `handover_plan_gate.py` (existence marker); false for `completion_gate.py`, whose marker
-       is a hash of the last reason and re-fires on any change. Fixed: the ADR now describes
-       the two mechanisms separately.
-    2. Row 8 ("amend `main`'s tip → unchanged") was stated unconditionally but only holds when
-       the amended commit isn't the fork point. Run live: amending the fork-point commit itself
-       moves the merge-base back one commit and changes the hash. Fixed: split into 8a
-       (past the fork point — unchanged) and 8b (is the fork point — changes), both observed,
-       with the ADR noting that row 8 was first written from a run that happened to satisfy
-       8a's precondition.
-  - 2026-09-18 — platform-reviewer's third pass (sonnet, round 3 — this repo's cap) confirmed
-    round 2's fixes, then FAILed on one enumeration error: "the two hooks that can block" —
-    `secret_scan.py` is a third (denies a commit when the staged diff matches a credential
-    shape), wired in the same PreToolUse group, unmentioned anywhere in the ADR. scope-auditor
-    PASSed.
-
-    **CPO ANSWER** (owner decision via `AskUserQuestion`, "Yes, fix and run round 4"): authorised
-    one round past the cap. Fixed: grep across `.claude/hooks/` confirms exactly three hooks call
-    `emit_deny` (`commit_review_gate`, `branch_discipline`, `secret_scan`), all stateless; the ADR
-    now names all three, notes `secret_scan.py` shares the approval-to-execution window, and
-    lists it alongside `branch_discipline.py` in "not covered" as wired-but-not-exercised.
+  - 2026-09-18 — round 1: platform-reviewer (opus) PASSed; scope-auditor FAILed on one finding —
+    the solo working agreement's copy of the self-check listed fewer claim types ("ADR", "test
+    name" missing) than the standard one, i.e. a different rule, not a lighter statement of the
+    same one. Fixed: solo now states the same rule with the same list. Also taken from the
+    platform-reviewer's non-blocking note: "Reviewers will check exactly this" was itself an
+    unbacked behaviour claim (no reviewer module has an explicit claims-vs-source hunt item) —
+    softened to "are asked to" in both files. The two digests appended earlier on this branch
+    were never released, so they were replaced rather than accumulated (the "never remove"
+    rule protects shipped defaults an older target may hold; these had shipped nowhere).
+  - 2026-09-18 — round 2: scope-auditor PASSed; platform-reviewer (opus) FAILed on two findings,
+    BOTH self-labelled "present since round 1 — review miss" under the rule this very diff adds
+    (the first time the rule has fired, and on its own author). Both fixed:
+    1. "Reviewers are asked to check exactly this" was still unbacked — no reviewer module had a
+       claims-vs-source hunt item, so the verb change in round 1 fixed nothing. Fixed by making
+       it true: every module (skeleton included, with a keep-this-item note) gained a numbered
+       hunt item "Claims against source" — confirm any behaviour assertion in the diff against
+       the code it describes; mismatch → FAIL with the contradicting `file:line`. Chosen over
+       dropping the sentence because it's the half of (B) that actually closes the loop.
+    2. The "present since round 1" half of (A) depended on an input reviewers aren't given (the
+       round number and round 1's findings live in `review.md`, which they don't read). Fixed
+       using an input they already have: the bullet now says both are in `contract.md`'s
+       `amendments`, and step 3 of both working agreements tells the builder to record each
+       round there before re-spawning — the convention this repo already follows by hand.
+    Digests refreshed again (same unreleased-replacement reasoning as round 1).
