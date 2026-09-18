@@ -53,8 +53,16 @@ scanner).
    `.claude/agents/`, removes any leftover legacy `cto-reviewer.md` (a name
    retired in favor of shipping `platform-reviewer.md` directly), composes
    and writes `review_routing.json`,
-   renders `.claude/rules/guard-paths.md`, and writes a starter `README.md`
-   if none exists.
+   renders `.claude/rules/guard-paths.md`, writes a starter `README.md`
+   if none exists (with a tracker-guidance line — the roadmap is the
+   project's issue tracker, never a markdown file), and reconciles
+   `.claude/working-agreement.md` with the interview's process tier —
+   asymmetrically: Solo converts whatever's there to the lightweight
+   version, but Standard only ever writes to reverse a recognised prior Solo
+   choice, fill in a missing file, or (with `--force`) replace an
+   unrecognised one — it never opportunistically "modernizes" an
+   already-standard file that merely predates the current kit release. See
+   [`docs/decisions/tracker-convention-and-process-tier.md`](decisions/tracker-convention-and-process-tier.md).
 3. Generation ends with a smoke test: it runs the target's own
    newly-generated `commit_review_gate.py` as a real subprocess with a
    simulated commit event, proving the gate actually denies an unreviewed

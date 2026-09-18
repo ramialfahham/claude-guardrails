@@ -438,6 +438,77 @@ def test_ci_provider_is_recorded_but_does_not_affect_selection():
     assert with_github == with_gitlab == with_none
 
 
+def test_tracker_provider_is_recorded_but_does_not_affect_selection():
+    _require_script()
+    with_github = pps.select_reviewer_modules(pps.SetupAnswers(tracker_provider="github"))
+    with_gitlab = pps.select_reviewer_modules(pps.SetupAnswers(tracker_provider="gitlab"))
+    with_none = pps.select_reviewer_modules(pps.SetupAnswers(tracker_provider="none"))
+    assert with_github == with_gitlab == with_none
+
+
+def test_process_tier_is_recorded_but_does_not_affect_selection():
+    # process tier changes which working-agreement.md generate() writes, not
+    # which reviewer modules are selected — that's a separate concern
+    _require_script()
+    solo = pps.select_reviewer_modules(pps.SetupAnswers(process_tier="solo"))
+    standard = pps.select_reviewer_modules(pps.SetupAnswers(process_tier="standard"))
+    assert solo == standard
+
+
+def test_build_preview_raises_a_clear_error_on_an_unrecognised_value():
+    # not a bare KeyError from the display-name dict lookup deep inside —
+    # the CLI's choices= already blocks this from argv, but a direct
+    # SetupAnswers caller (a test, another script) needs a real message
+    _require_script()
+    for kwargs in (
+            {"tracker_provider": "bogus"},
+            {"process_tier": "bogus"},
+            {"ci_provider": "bogus"}):
+        try:
+            pps.build_preview(pps.SetupAnswers(**kwargs))
+            assert False, f"expected ValueError for {kwargs}"
+        except ValueError:
+            pass
+
+
+def test_preview_notes_reflect_tracker_and_process_tier_answers():
+    _require_script()
+    preview = pps.build_preview(pps.SetupAnswers(tracker_provider="gitlab", process_tier="solo"))
+    assert preview["answers"]["tracker_provider"] == "gitlab"
+    assert preview["answers"]["process_tier"] == "solo"
+    assert "GitLab" in preview["tracker_provider_note"]
+    assert "Solo" in preview["process_tier_note"]
+
+
+def test_standard_process_tier_note_does_not_overclaim_unconditional_preservation():
+    # round 5's finding: the note used to say Standard's working-agreement.md
+    # "is left as-is" unconditionally, contradicting generate() actually
+    # writing it to reverse a prior Solo choice or fill a missing file
+    _require_script()
+    preview = pps.build_preview(pps.SetupAnswers(process_tier="standard"))
+    note = preview["process_tier_note"]
+    assert "reverse" in note or "Solo choice" in note, (
+        "the Standard note must acknowledge it CAN still write (reversing a "
+        "prior Solo choice / filling a missing file), not claim unconditional "
+        "preservation")
+
+
+def test_solo_process_tier_note_mentions_the_refusal_case():
+    # round 11's finding: the Solo note claimed generation "converts
+    # working-agreement.md ... whatever tier it's currently on", but an
+    # unrecognised (hand-customized) file with no --force makes generate()
+    # refuse the ENTIRE run (not just that one file) — the Standard branch
+    # of this same note already describes its own --force behavior; Solo's
+    # didn't describe its own refusal behavior
+    _require_script()
+    preview = pps.build_preview(pps.SetupAnswers(process_tier="solo"))
+    note = preview["process_tier_note"]
+    assert "--force" in note and "refus" in note.lower(), (
+        "the Solo note must acknowledge an unrecognised file refuses the "
+        "whole generation unless --force is passed, not claim it always "
+        "converts regardless of state")
+
+
 if __name__ == "__main__":
     _failed = 0
     for _name, _fn in sorted(globals().items()):

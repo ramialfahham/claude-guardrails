@@ -5,6 +5,10 @@ in, and state it back to the owner before writing code.
 
 objective: <one sentence — what this unit of work delivers>
 
+tracking_issue: <URL or ID of the issue/ticket this task closes, or "(none — no tracker
+  in use)">. The tracker (GitHub/GitLab Issues, milestones/epics) is the single source of
+  truth for what's ahead — never create a roadmap/backlog markdown file instead.
+
 scope_paths:
   - <a path or glob the work may touch, e.g. models/marts/**>
   - <one per line — edits outside this list are drift>

@@ -71,7 +71,8 @@ Run it with `--help` for the full usage.
 
 **Getting a tailored reviewer set, not just the two defaults.** Run the `/setup-project` skill
 from a `claude-project-kit` checkout (in Claude Code, after cloning this repo) to interview you
-on your project's stack and generate a reviewer set to match — see
+on your project's stack, its issue tracker, and how much process it needs (Standard, or a
+lighter Solo/small tier), then generate a setup to match — see
 [What's in the repo](#whats-in-the-repo) below.
 
 **Pulling in later kit improvements.** Every bootstrap/re-run stamps `.claude/.kit-version`
@@ -81,8 +82,13 @@ project was set up via `/setup-project`, the kit doesn't remember which stack yo
 — re-run `scripts/generate_project_setup.py --target /path/to/project` with the SAME stack flags
 you originally gave the interview (`--dbt`, `--data-eng`, etc.); passing the wrong ones shrinks
 the reviewer set. It refuses to touch a `review_routing.json`/`guard-paths.md` you've since
-hand-tuned unless you also pass `--force` — only pass that once you've confirmed the flags are
-right, never as a matter of course.
+hand-tuned unless you also pass `--force`; `working-agreement.md` is narrower still and
+depends on which process tier you pass — Standard tier only ever writes it to reverse a
+recognized prior Solo choice or fill in a missing file, and `--force` there only overrides an
+unrecognized (hand-customized) file, never a recognized standard default of any vintage;
+Solo tier converts whatever's there, `--force` required only if it's unrecognized. Only pass
+`--force` once you've confirmed the flags are right, never as a matter of
+course.
 
 ## Requirements
 

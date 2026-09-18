@@ -1,0 +1,11 @@
+{
+  "_comment": "sha256 digest -> tier, for every RELEASED working-agreement.md default this kit has ever shipped (.claude/working-agreement.md = 'standard', templates/working-agreement-solo.md.tmpl = 'solo'). Append a new entry whenever either file's content changes -- never remove one, since an older target may still hold it. Backfilled once at authoring time from this repo's own git history (git log --follow -- .claude/working-agreement.md); every entry after that point is added by hand alongside the change that produces it, never derived from git again. .claude/tests/test_generate_project_setup.py's digest-parity test fails the build if the CURRENT content of either file isn't listed, the same guard test_routing_doc_parity.py already gives guard-paths.md/review_routing.json.",
+  "digests": {
+    "625d92a68703ae18846dcdd5293407138854c0ecfa7e2a72e4460e2c908f2e8a": "standard",
+    "765df37fd5803b7a58b9687f98d54bc405b292a5598d5ca4685686b757c1712a": "standard",
+    "1eef7c0e0311b8f63c214af4839267d13719ef5d1eb66fa6db368a61609f6ea5": "standard",
+    "8e08258cb8cb54f08dfa4d060525d4694475fec8e7c7e26800563defce404ed8": "standard",
+    "72bdb6f271f33b407cf4b437ca5d6c99e474613f233b6318af8f730d296e35e1": "standard",
+    "84d9e130f2be416792532ae760db055a9e711f5f1b47e43e31bb556ab477a616": "solo"
+  }
+}

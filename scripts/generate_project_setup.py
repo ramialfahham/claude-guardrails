@@ -12,7 +12,33 @@ project bootstrapped before this kit retired that legacy name (superseded by
 selected — a fresh bootstrap ships that name directly and never creates the
 legacy file at all), composes and writes a real
 `TARGET/.claude/review_routing.json`, renders `TARGET/.claude/rules/guard-paths.md`
-from the template, and writes a starter `TARGET/README.md` if none exists.
+from the template, writes a starter `TARGET/README.md` if none exists (with a
+tracker-guidance line reflecting `answers.tracker_provider` — the roadmap is
+never a markdown file in this kit's convention), and reconciles
+`TARGET/.claude/working-agreement.md` with `answers.process_tier` —
+asymmetrically, not a blind overwrite either way. `"solo"` converts whatever
+is currently there (subject to a hand-customization check) to the
+lightweight template. `"standard"` only ever writes back to reverse a
+RECOGNISED prior Solo choice (current content's sha256 is listed as `"solo"`
+in `templates/known-working-agreement-digests.json` — any released Solo
+vintage, not just the current template) or to fill in a genuinely missing
+file, or when `force=True`; an existing file that's already some vintage of
+standard is otherwise deliberately left untouched, never opportunistically
+"modernized" to this checkout's current text.
+
+That asymmetry, and the digest-list recognition mechanism itself, are both
+the product of review catching real defects across several rounds — several
+of them past this repo's 3-round cap, explicitly owner-authorized (see
+`.claude/task/contract.md`'s amendments log for the full account, not
+repeated here or given a specific count that would only go stale): an
+earlier version tried recognizing a target's ACTUAL historical bootstrap
+default via `.claude/.kit-version` + a `git show` against this kit's own
+history, which seemed more precise but broke on this kit's own documented
+upgrade path (`bootstrap.sh` restamps `.kit-version` on every re-run while
+`working-agreement.md` itself is `keep_file`-protected, so the two drift out
+of sync) — the boring, static, shipped-list alternative recognizes every
+released default correctly regardless of git history, clone depth, or
+bootstrap timing.
 
 Reuses `preview_project_setup.py`'s selection/composition functions directly
 (never reimplemented) and `compose_routing.py`'s `compose()`/`_write_atomic()`
@@ -65,10 +91,16 @@ _REVIEWERS_DIR = os.path.join(_REPO_ROOT, "templates", "reviewers")
 _FRAGMENTS_DIR = os.path.join(_REVIEWERS_DIR, "routing")
 _GUARD_PATHS_TMPL = os.path.join(_REPO_ROOT, "templates", "rules", "guard-paths.md.tmpl")
 _README_TMPL = os.path.join(_REPO_ROOT, "templates", "starter-README.md.tmpl")
+_KIT_WORKING_AGREEMENT = os.path.join(_REPO_ROOT, ".claude", "working-agreement.md")
+_SOLO_WORKING_AGREEMENT_TMPL = os.path.join(
+    _REPO_ROOT, "templates", "working-agreement-solo.md.tmpl")
+_WORKING_AGREEMENT_DIGESTS_FILE = os.path.join(
+    _REPO_ROOT, "templates", "known-working-agreement-digests.json")
 
 sys.path.insert(0, _SCRIPTS_DIR)
 import compose_routing  # noqa: E402
 from preview_project_setup import (  # noqa: E402
+    _PROVIDER_DISPLAY_NAME,
     SetupAnswers,
     build_guard_paths_preview,
     build_naming_lint_report,
@@ -197,6 +229,74 @@ def _guard_paths_needs_force(target: str) -> bool:
     return m.group(1) != hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def _load_known_working_agreement_digests(
+        digests_file: str = _WORKING_AGREEMENT_DIGESTS_FILE) -> dict[str, str]:
+    """sha256 hexdigest -> tier ("standard"/"solo"), for every RELEASED
+    working-agreement.md default this kit has ever shipped — a static,
+    shipped list (templates/known-working-agreement-digests.json), not a
+    git-history reconstruction. Round 3's review found the git-subprocess
+    approach had a real coupling bug: bootstrap.sh overwrites
+    `.claude/.kit-version` on every re-run while `working-agreement.md`
+    itself is `keep_file`-protected, so the stamped SHA silently stops
+    matching what's on disk the moment anyone follows this kit's own
+    documented upgrade path (re-run bootstrap.sh, then re-run
+    /setup-project) — reinstating the exact lockout the mechanism existed to
+    prevent. A flat, append-only digest list has no such coupling: it's
+    correct regardless of git history, clone depth, or bootstrap timing.
+
+    Raises GenerationRefused (not a bare exception) if this kit's own shipped
+    digests file is missing, isn't valid JSON, or doesn't have the expected
+    {"digests": {...}} shape — every other content problem in this file
+    raises the same way; a shipped file this broken should stop generation
+    outright, not silently treat every working-agreement.md as unrecognised
+    (which would just make hand-customization refusals over-fire) or crash
+    with an unrelated traceback."""
+    try:
+        with open(digests_file, encoding="utf-8") as f:
+            data = json.load(f)
+        digests = data["digests"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+        raise GenerationRefused(
+            f"{digests_file} is missing or malformed ({e!r}) — this kit's own "
+            "shipped digest list is broken; nothing written") from e
+    if not isinstance(digests, dict) or not all(
+            isinstance(k, str) and v in ("standard", "solo")
+            for k, v in digests.items()):
+        raise GenerationRefused(
+            f"{digests_file}'s \"digests\" value isn't a flat map of string keys "
+            "to 'standard'/'solo' — this kit's own shipped digest list is "
+            "broken; nothing written")
+    return digests
+
+
+def _working_agreement_tier(
+        content: str, digests: dict[str, str] | None = None) -> str | None:
+    """"standard"/"solo" if `content`'s sha256 is a known released default,
+    else None (unrecognised — hand-customized, or a default not yet listed)."""
+    if digests is None:
+        digests = _load_known_working_agreement_digests()
+    return digests.get(hashlib.sha256(content.encode("utf-8")).hexdigest())
+
+
+def _working_agreement_needs_force(
+        target: str, digests: dict[str, str] | None = None) -> bool:
+    """True if target's .claude/working-agreement.md looks hand-customized —
+    i.e. its digest isn't in the known-digests list. False (safe to converge
+    to Solo) if the file is absent or its digest is recognised, whatever
+    tier/vintage. Only ever gates the Solo write path (see generate()) —
+    Standard never needs this check, since it only ever writes from a state
+    that's inherently safe (missing, or a recognised prior Solo choice) or
+    when the owner explicitly passes force=True on an unrecognised file.
+    `digests` is injectable (tests exercise a historical entry without
+    needing it in the kit's own real, current digest list)."""
+    path = os.path.join(target, ".claude", "working-agreement.md")
+    if not os.path.isfile(path):
+        return False
+    with open(path, encoding="utf-8") as f:
+        current = f.read()
+    return _working_agreement_tier(current, digests=digests) is None
+
+
 class GenerationRefused(Exception):
     """Raised with a human-readable reason; nothing is written before this
     can be raised — every check in generate() runs before the first write."""
@@ -250,7 +350,8 @@ def _render_guard_paths(tmpl_path: str, guard_preview: dict) -> str:
     return marker + "\n\n" + text
 
 
-def _render_readme(tmpl_path: str, target: str, module_names: list[str]) -> str:
+def _render_readme(tmpl_path: str, target: str, module_names: list[str],
+                    tracker_provider: str = "none") -> str:
     """Fill templates/starter-README.md.tmpl's placeholders. Only called when
     target/README.md doesn't already exist (see generate())."""
     with open(tmpl_path, encoding="utf-8") as f:
@@ -265,7 +366,18 @@ def _render_readme(tmpl_path: str, target: str, module_names: list[str]) -> str:
         r"- <module name>",
         reviewer_list, text, count=1)
 
-    if "<REPLACE" in text or "<module name>" in text:
+    tracker_guidance = (
+        f"Track what's ahead in {_PROVIDER_DISPLAY_NAME[tracker_provider]} Issues "
+        "(milestones/epics) — never a ROADMAP.md/BACKLOG.md file."
+        if tracker_provider != "none" else
+        "Track what's ahead in this project's issue tracker once it has one — never a "
+        "ROADMAP.md/BACKLOG.md file."
+    )
+    text = re.sub(
+        r"<!-- REPLACE with the tracker guidance line -->\n<tracker guidance>",
+        tracker_guidance, text, count=1)
+
+    if "<REPLACE" in text or "<module name>" in text or "<tracker guidance>" in text:
         raise GenerationRefused(
             "templates/starter-README.md.tmpl has drifted from what this "
             "renderer expects — a placeholder marker was left unfilled; fix "
@@ -279,23 +391,41 @@ def generate(target: str, answers: SetupAnswers,
              guard_paths_tmpl: str = _GUARD_PATHS_TMPL,
              readme_tmpl: str = _README_TMPL,
              kit_routing_file: str = _KIT_ROUTING_FILE,
+             working_agreement_digests: dict[str, str] | None = None,
              force: bool = False) -> dict:
     """Write the tailored governance setup into `target`. Raises
     GenerationRefused with NOTHING written if any of: `target` isn't
-    bootstrapped; a selected module fails the naming lint; `target`'s
+    bootstrapped; a selected module fails the naming lint; `answers.process_tier`
+    or `answers.tracker_provider` isn't a recognised value; `target`'s
     `review_routing.json` or `guard-paths.md` already look hand-customized
-    and `force` isn't set; either template has drifted from what this file's
-    renderers expect. Every one of those checks — including rendering both
-    templates — runs before the first write, so a refusal never leaves a
-    half-generated target. Returns a summary dict for a caller (the CLI, the
-    skill) to print verbatim rather than re-narrate.
+    and `force` isn't set; `answers.process_tier == "solo"` and
+    `working-agreement.md` already looks hand-customized (its digest isn't in
+    `templates/known-working-agreement-digests.json`) and `force` isn't set
+    (Standard never needs this check — see the module docstring's asymmetry
+    note: it only ever converts FROM a recognised Solo state, or writes when
+    `force=True`, never clobbers an unrecognised file on its own); either
+    template has drifted from what this file's renderers expect. Every one
+    of those checks — including rendering both templates — runs before the
+    first write, so a refusal never leaves a half-generated target. Returns
+    a summary dict for a caller (the CLI, the skill) to print verbatim
+    rather than re-narrate.
 
     `force=True` overwrites an already-customized review_routing.json/
     guard-paths.md deliberately — the same escape hatch bootstrap.sh's own
-    `keep_file`/`--force` convention uses for project-owned config. Not
-    needed to simply re-run generate() with different answers: this tool's
-    own prior output is recognised (via the `_generated_by` marker / the
-    guard-paths.md marker line) as safe to regenerate without it."""
+    `keep_file`/`--force` convention uses for project-owned config.
+    `working-agreement.md` is narrower: `force` only overrides it when the
+    current file is UNRECOGNISED (round 4's review caught an earlier version
+    letting `force` overwrite ANY current content, including a recognised
+    older-standard file — the exact silent-rewrite round 2 already flagged,
+    re-entered via this flag) — a recognised standard or Solo file, of any
+    vintage, is always left alone by Standard tier regardless of `force`.
+    Not needed to simply re-run generate() with different answers, including
+    a different process_tier: this tool's own prior output is recognised
+    (via the `_generated_by` marker / the guard-paths.md marker line /
+    working-agreement.md's own digest list) as safe to regenerate without
+    it. `working_agreement_digests` is injectable (tests exercise a
+    historical digest without it needing to be in this kit's own real,
+    current `templates/known-working-agreement-digests.json`)."""
     _require_bootstrapped(target)
 
     module_names = select_reviewer_modules(answers, reviewers_dir)
@@ -317,6 +447,20 @@ def generate(target: str, answers: SetupAnswers,
             f"{target}/.claude/rules/guard-paths.md already exists and "
             "wasn't generated by this tool — pass force=True to overwrite "
             "it deliberately")
+    if answers.process_tier not in ("solo", "standard"):
+        raise GenerationRefused(
+            f"answers.process_tier={answers.process_tier!r} is not 'solo' or "
+            "'standard' — nothing written")
+    if answers.tracker_provider not in _PROVIDER_DISPLAY_NAME and answers.tracker_provider != "none":
+        raise GenerationRefused(
+            f"answers.tracker_provider={answers.tracker_provider!r} is not "
+            "'github', 'gitlab', or 'none' — nothing written")
+    if (answers.process_tier == "solo" and not force
+            and _working_agreement_needs_force(target, digests=working_agreement_digests)):
+        raise GenerationRefused(
+            f"{target}/.claude/working-agreement.md already looks "
+            "hand-customized (not a state this tool recognises as its own) "
+            "— pass force=True to overwrite it deliberately")
 
     # Render both templates NOW, before any write — a template-drift
     # GenerationRefused must never fire after a write has already happened.
@@ -332,8 +476,77 @@ def generate(target: str, answers: SetupAnswers,
     guard_md = _render_guard_paths(guard_paths_tmpl, guard_preview)  # may raise
     readme_path = os.path.join(target, "README.md")
     readme_needed = not os.path.isfile(readme_path)
-    readme_text = (_render_readme(readme_tmpl, target, module_names)  # may raise
-                   if readme_needed else None)
+    readme_text = (  # may raise
+        _render_readme(readme_tmpl, target, module_names, answers.tracker_provider)
+        if readme_needed else None)
+    with open(_SOLO_WORKING_AGREEMENT_TMPL, encoding="utf-8") as f:
+        solo_working_agreement = f.read()
+    wa_path = os.path.join(target, ".claude", "working-agreement.md")
+    current_working_agreement = None
+    if os.path.isfile(wa_path):
+        with open(wa_path, encoding="utf-8") as f:
+            current_working_agreement = f.read()
+    current_tier = (None if current_working_agreement is None
+                     else _working_agreement_tier(
+                         current_working_agreement, digests=working_agreement_digests))
+    if answers.process_tier == "solo":
+        write_working_agreement = current_working_agreement != solo_working_agreement
+        desired_working_agreement = solo_working_agreement
+        working_agreement_reason = (
+            "solo: filled in a missing file with the lightweight template"
+            if write_working_agreement and current_working_agreement is None else
+            "solo: converted to the lightweight template"
+            if write_working_agreement else
+            "solo: already the solo template, nothing to do")
+    else:
+        # Standard NEVER opportunistically "modernizes" an existing file to
+        # this checkout's current text — that would silently overwrite a
+        # target's project-owned working-agreement.md (keep_file-protected
+        # by bootstrap.sh) just because it happens to predate a kit release,
+        # which is exactly what round 2's review caught this doing. Standard
+        # only writes to reverse a RECOGNISED prior Solo choice (current
+        # file's digest is listed as "solo" — any released Solo vintage, not
+        # just the current template) or to fill in a missing file; anything
+        # else RECOGNISED as already-standard, whatever vintage, is left
+        # alone even under `force` — round 4's review caught an earlier
+        # version of this line letting `force` overwrite ANY current
+        # content, including a recognised older-standard file, which is
+        # round 2's silent-rewrite defect re-entered via that flag instead
+        # of via the digest-recognition gap. `force` only ever overrides an
+        # UNRECOGNISED (hand-customized) file — the escape hatch review
+        # round 3 found documented but not actually honoured.
+        with open(_KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+            desired_working_agreement = f.read()
+        # Each branch decides BOTH write_working_agreement and its own reason
+        # together, so the two can never disagree (round 6's review found an
+        # earlier version deriving the reason from a SEPARATE re-check of the
+        # same conditions, which a not-yet-possible fourth tier value could
+        # have silently mismatched against the boolean it was supposed to
+        # explain — `_load_known_working_agreement_digests` now also
+        # validates every digest value is exactly "standard"/"solo", so
+        # `current_tier` itself can never be anything else, but deriving the
+        # reason from the same decision closes the class structurally rather
+        # than relying on that validation alone).
+        if current_working_agreement is None:
+            write_working_agreement = True
+            working_agreement_reason = "standard: filled in a missing file"
+        elif current_tier == "solo":
+            write_working_agreement = True
+            working_agreement_reason = "standard: reversed a recognised prior Solo choice"
+        elif current_tier == "standard":
+            write_working_agreement = False
+            working_agreement_reason = (
+                "standard: already a recognised standard file (this vintage or an "
+                "earlier one), left as-is regardless of force")
+        elif force:
+            write_working_agreement = True
+            working_agreement_reason = (
+                "standard: file is unrecognised (hand-customized) — force-overwrote it")
+        else:
+            write_working_agreement = False
+            working_agreement_reason = (
+                "standard: file is unrecognised (hand-customized) and force wasn't "
+                "given — left as-is")
 
     # Nothing above this point has written anything. From here on, only
     # operations that (by construction) cannot themselves fail on content.
@@ -342,6 +555,8 @@ def generate(target: str, answers: SetupAnswers,
         "modules_installed": [],
         "legacy_reviewer_removed": False,
         "readme_written": False,
+        "working_agreement_written": False,
+        "working_agreement_reason": working_agreement_reason,
     }
 
     agents_dir = os.path.join(target, ".claude", "agents")
@@ -375,6 +590,10 @@ def generate(target: str, answers: SetupAnswers,
     if readme_needed:
         compose_routing._write_atomic(readme_path, readme_text)
         summary["readme_written"] = True
+
+    if write_working_agreement:
+        compose_routing._write_atomic(wa_path, desired_working_agreement)
+        summary["working_agreement_written"] = True
 
     return summary
 
@@ -530,12 +749,15 @@ def main() -> int:
     parser.add_argument("--frontend", action="store_true")
     parser.add_argument("--sensitive-data", action="store_true")
     parser.add_argument("--ci-provider", choices=["github", "gitlab", "none"], default="none")
+    parser.add_argument("--tracker-provider", choices=["github", "gitlab", "none"], default="none")
+    parser.add_argument("--process-tier", choices=["solo", "standard"], default="standard")
     parser.add_argument("--force", action="store_true",
                          help="overwrite an already-customized "
-                              "review_routing.json/guard-paths.md deliberately "
-                              "(not needed to just re-run with different "
-                              "answers — this tool's own prior output is "
-                              "recognised as safe to regenerate)")
+                              "review_routing.json/guard-paths.md/"
+                              "working-agreement.md deliberately (not needed "
+                              "to just re-run with different answers — this "
+                              "tool's own prior output is recognised as safe "
+                              "to regenerate)")
     # Deliberately NO --unmatched-stack flag — see the module docstring. Also
     # deliberately no flag to skip the smoke test — the contract's done_when
     # describes generation and the smoke test as one operation; a caller
@@ -547,6 +769,7 @@ def main() -> int:
     answers = SetupAnswers(
         dbt=args.dbt, data_eng=args.data_eng, frontend=args.frontend,
         sensitive_data=args.sensitive_data, ci_provider=args.ci_provider,
+        tracker_provider=args.tracker_provider, process_tier=args.process_tier,
     )
     try:
         summary = generate(args.target, answers, force=args.force)
@@ -560,6 +783,8 @@ def main() -> int:
     print(f"  review_routing.json written: {summary['review_routing_written']}")
     print(f"  guard-paths.md written: {summary['guard_paths_written']}")
     print(f"  README.md written: {summary['readme_written']}")
+    print(f"  working-agreement.md written: {summary['working_agreement_written']} "
+          f"({summary['working_agreement_reason']})")
 
     try:
         smoke = smoke_test(args.target)
