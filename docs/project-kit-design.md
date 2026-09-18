@@ -202,6 +202,15 @@ approval-to-execution window it cannot close. See
 [`docs/decisions/parallel-sessions-use-worktrees.md`](decisions/parallel-sessions-use-worktrees.md)
 for what was actually run to establish that.
 
+Headless mode (`claude -p`, the Agent SDK, CI): the hooks run and a hook
+`deny` blocks a commit exactly as in an interactive session, including under
+`--dangerously-skip-permissions` — verified by running it. What changes is
+that nothing can ask a person anything (`AskUserQuestion` isn't offered in
+`-p`), so an ESCALATE stays unanswered and the commit stays blocked. The one
+real off-switch is `--bare`, which skips hook loading and is slated to become
+`-p`'s default. See
+[`docs/decisions/headless-mode-compatibility.md`](decisions/headless-mode-compatibility.md).
+
 ## Keeping a project up to date
 
 `bootstrap.sh` stamps `.claude/.kit-version` (this kit's own commit SHA) on
