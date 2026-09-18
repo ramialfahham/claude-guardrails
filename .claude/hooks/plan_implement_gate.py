@@ -12,7 +12,11 @@ Fails open on any error.
 from __future__ import annotations
 
 import json
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _command_utils import project_opted_in  # noqa: E402
 
 MESSAGE = (
     "BEFORE YOU IMPLEMENT (plan just approved): "
@@ -28,9 +32,11 @@ MESSAGE = (
 
 def main() -> int:
     try:
-        sys.stdin.read()  # drain the event; we fire unconditionally on ExitPlanMode
+        event = json.loads(sys.stdin.read() or "{}")
     except Exception:
-        pass
+        event = {}
+    if not project_opted_in(event):
+        return 0
     try:
         print(json.dumps({
             "hookSpecificOutput": {

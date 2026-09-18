@@ -1,0 +1,24 @@
+{
+  "name": "claude-project-kit",
+  "displayName": "claude-project-kit",
+  "version": "0.1.0",
+  "description": "Repo-level guardrails for Claude Code: a review gate that blocks unreviewed commits, branch discipline, secret scan, session handover, and a guided /setup-project that tailors reviewers to the project.",
+  "repository": "https://gitlab.com/rami.al-fahham/claude-project-kit",
+  "license": "MIT",
+  "keywords": [
+    "guardrails",
+    "review-gate",
+    "hooks",
+    "governance"
+  ],
+  "hooks": "./.claude/hooks/hooks.json",
+  "agents": [
+    "./.claude/agents/platform-reviewer.md",
+    "./.claude/agents/scope-auditor.md"
+  ],
+  "skills": "./.claude/skills/",
+  "commands": [
+    "./.claude/commands/status.md",
+    "./.claude/commands/sync-branch.md"
+  ]
+}

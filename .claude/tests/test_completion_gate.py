@@ -396,24 +396,31 @@ def test_fails_open_on_non_dict_event():
     # than {} — a naive event.get("agent_id") on that value would raise
     # AttributeError, uncaught, breaking the "fails open on any error"
     # promise. Must not happen for any of these shapes.
-    for payload in ("[]", "null", "42", '"just a string"'):
-        old_argv, old_stdin = sys.argv, sys.stdin
-        old_env = os.environ.get("CLAUDE_PROJECT_DIR")
-        sys.argv = ["completion_gate.py"]
-        sys.stdin = io.StringIO(payload)
-        os.environ["CLAUDE_PROJECT_DIR"] = tempfile.gettempdir()
-        buf = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                exit_code = cg.main()
-        finally:
-            sys.argv, sys.stdin = old_argv, old_stdin
-            if old_env is None:
-                os.environ.pop("CLAUDE_PROJECT_DIR", None)
-            else:
-                os.environ["CLAUDE_PROJECT_DIR"] = old_env
-        assert exit_code == 0, f"non-dict payload {payload!r} must still exit cleanly"
-        assert buf.getvalue().strip() == "", f"non-dict payload {payload!r} must produce no output"
+    # The project dir must carry the opt-in marker (.claude/review_routing.json),
+    # otherwise main() returns at the plugin opt-in check before ever touching
+    # the event, and this test would pass without exercising its subject.
+    with tempfile.TemporaryDirectory(prefix="cg-optin-") as opted_in:
+        os.makedirs(os.path.join(opted_in, ".claude"))
+        with open(os.path.join(opted_in, ".claude", "review_routing.json"), "w", encoding="utf-8") as f:
+            f.write('{"always": [], "paths": {}}')
+        for payload in ("[]", "null", "42", '"just a string"'):
+            old_argv, old_stdin = sys.argv, sys.stdin
+            old_env = os.environ.get("CLAUDE_PROJECT_DIR")
+            sys.argv = ["completion_gate.py"]
+            sys.stdin = io.StringIO(payload)
+            os.environ["CLAUDE_PROJECT_DIR"] = opted_in
+            buf = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    exit_code = cg.main()
+            finally:
+                sys.argv, sys.stdin = old_argv, old_stdin
+                if old_env is None:
+                    os.environ.pop("CLAUDE_PROJECT_DIR", None)
+                else:
+                    os.environ["CLAUDE_PROJECT_DIR"] = old_env
+            assert exit_code == 0, f"non-dict payload {payload!r} must still exit cleanly"
+            assert buf.getvalue().strip() == "", f"non-dict payload {payload!r} must produce no output"
 
 
 if __name__ == "__main__":

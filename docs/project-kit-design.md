@@ -38,6 +38,35 @@ scanner).
 
 ## Setting up a new project
 
+> **In transition to a plugin.** The flow below — clone the kit, run its
+> scripts at your project — is how the kit worked through phase 7, and it
+> failed the first real test: starting a new project from its own folder. The
+> kit is becoming a Claude Code plugin named `claude-project-kit`, in three
+> phases. Phase 1 (done) makes this repo loadable as a plugin: a
+> `.claude-plugin/plugin.json` manifest points at the existing
+> `.claude/{hooks,agents,skills,commands}`, `.claude/hooks/hooks.json` wires
+> the same hooks via `${CLAUDE_PLUGIN_ROOT}`, and every hook now no-ops
+> unless the project has `.claude/review_routing.json` — the opt-in marker —
+> because plugin hooks are otherwise loaded in every project. Verified live
+> on 2026-09-18 (Claude Code v2.1.223, `--model haiku`), in a throwaway git
+> repo with one staged file and **no `.claude/` directory**, each run
+> `claude --plugin-dir D:\Projects\claude-guardrails -p --allowedTools Bash
+> --output-format json "Run exactly: git commit -m ..."`:
+>
+> | Step | Observed |
+> |---|---|
+> | `--output-format stream-json`, first run | `system/init` → `plugins: ['claude-project-kit', ...]`, `plugin_errors: None`; `slash_commands` included `claude-project-kit:status` and `:sync-branch` (the two `commands/*.md`) and `claude-project-kit:setup-project` (the existing skill under `skills/`, which Claude Code also lists as a slash command — it still refuses outside a kit checkout until phase 2); agents `claude-project-kit:platform-reviewer`, `:scope-auditor`. (A first attempt with `"agents": "./.claude/agents/"` failed: `Validation errors: agents: Invalid input` — directories aren't accepted, file lists are.) |
+> | commit, no marker | result `COMMITTED`, `permission_denials: 0`, `git log` gained the commit — **ungated** |
+> | `cp <kit>/.claude/review_routing.json .claude/`, stage another file, commit | result `REVIEW GATE: no review found. Stage the change, run the required reviewers, and write .claude/task/review.md …`, `permission_denials: 1`, no new commit — **denied** |
+>
+> The same runs show plugin hooks fire under `claude -p` — Anthropic's
+> headless page says that of `.claude/settings.json` hooks and is silent on
+> plugin hooks. Phase 2 makes `/claude-project-kit:setup-project` do the whole
+> setup from the project folder and retires `bootstrap.sh`; phase 3 adds the
+> marketplace install and migrates projects set up the old way. Plugin
+> agents are namespaced (`claude-project-kit:scope-auditor`) — routing and
+> docs still use bare names; phase 2 reconciles that.
+
 1. `scripts/bootstrap.sh /path/to/project` — copies the guard code
    (`.claude/{hooks,agents,commands,skills,tests}`) and the `task/` templates
    in. Safe to re-run: kit code always refreshes, project-owned config

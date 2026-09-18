@@ -124,6 +124,7 @@ from _command_utils import (  # noqa: E402
     bash_command,
     emit_context,
     git_subcommand,
+    project_opted_in,
     read_event,
     simple_commands,
 )
@@ -177,6 +178,8 @@ def _should_fire(marker: str, reason: str) -> bool:
 def main() -> int:
     try:
         event = read_event()
+        if not project_opted_in(event):
+            return 0
         if event.get("agent_id"):
             return 0
         cmd = bash_command(event)
