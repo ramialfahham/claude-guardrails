@@ -80,6 +80,10 @@ _BASE_ROUTING: dict = {
 _APPLIES_WHEN_RE = re.compile(r"^applies_when:\s*\[([^\]]*)\]", re.MULTILINE)
 _MODEL_RE = re.compile(r"^model:\s*(\S+)", re.MULTILINE)
 
+_PROVIDER_DISPLAY_NAME = {"github": "GitHub", "gitlab": "GitLab"}  # str.title() gives
+# "Gitlab"/"Github", not the real product names — shared here so every caller (the preview
+# notes, the rendered starter README) gets consistent, correct capitalization.
+
 _TAG_TO_ANSWER_FIELD = {
     "dbt": "dbt",
     "data-eng": "data_eng",
@@ -95,6 +99,8 @@ class SetupAnswers:
     frontend: bool = False
     sensitive_data: bool = False
     ci_provider: str = "none"  # "github" | "gitlab" | "none"
+    tracker_provider: str = "none"  # "github" | "gitlab" | "none"
+    process_tier: str = "standard"  # "solo" | "standard"
     unmatched_stack_description: str = ""  # "" means no unmatched-stack escalation
 
 
@@ -282,7 +288,18 @@ def build_escalations(answers: SetupAnswers) -> list[str]:
 
 def build_preview(answers: SetupAnswers) -> dict:
     """Assembles every preview section into one dict — the single source of
-    truth both the tests and `format_preview`/the CLI render from."""
+    truth both the tests and `format_preview`/the CLI render from. Raises
+    ValueError (not a bare KeyError from a display-name lookup) for an
+    unrecognised `ci_provider`/`tracker_provider`/`process_tier` — the CLI's
+    own `choices=` already prevents this from argv, but a direct
+    `SetupAnswers` caller (tests, another script) gets a clear message
+    instead of an opaque crash deep in dict indexing."""
+    for field_name, value, allowed in (
+            ("ci_provider", answers.ci_provider, {"github", "gitlab", "none"}),
+            ("tracker_provider", answers.tracker_provider, {"github", "gitlab", "none"}),
+            ("process_tier", answers.process_tier, {"solo", "standard"})):
+        if value not in allowed:
+            raise ValueError(f"answers.{field_name}={value!r} is not one of {allowed}")
     module_names = select_reviewer_modules(answers)
     routing_preview = build_routing_preview(module_names)
     return {
@@ -292,6 +309,8 @@ def build_preview(answers: SetupAnswers) -> dict:
             "frontend": answers.frontend,
             "sensitive_data": answers.sensitive_data,
             "ci_provider": answers.ci_provider,
+            "tracker_provider": answers.tracker_provider,
+            "process_tier": answers.process_tier,
         },
         "selected_modules": module_names,
         "model_tiers": build_model_tiers(module_names),
@@ -306,6 +325,26 @@ def build_preview(answers: SetupAnswers) -> dict:
             if answers.ci_provider != "none" else
             "No CI provider given — static-scan/live-check template wiring "
             "(a later phase) will need one."
+        ),
+        "tracker_provider_note": (
+            f"Roadmap tracking will point at "
+            f"{_PROVIDER_DISPLAY_NAME[answers.tracker_provider]} Issues in the "
+            "starter README — the roadmap is never a markdown file in this project."
+            if answers.tracker_provider != "none" else
+            "No tracker given — the starter README will say to name one before "
+            "tracking any backlog, rather than defaulting to a roadmap file."
+        ),
+        "process_tier_note": (
+            "Solo tier: generation converts working-agreement.md to a lightweight "
+            "version (no mandatory task contract for routine changes, no ADR "
+            "requirement) if it's recognised (any released standard or Solo vintage) "
+            "or missing — but an unrecognised (hand-customized) file REFUSES the "
+            "entire generation, not just that one file, unless --force is passed."
+            if answers.process_tier == "solo" else
+            "Standard tier: generation leaves an already-standard "
+            "working-agreement.md (any released vintage) as-is; it only writes to "
+            "reverse a recognised prior Solo choice or fill in a missing file — "
+            "never to overwrite a hand-customized file without --force."
         ),
     }
 
@@ -331,6 +370,12 @@ def format_preview(preview: dict) -> str:
     lines.append(f"CI provider: {preview['answers']['ci_provider']} — "
                   f"{preview['ci_provider_note']}")
     lines.append("")
+    lines.append(f"Tracker: {preview['answers']['tracker_provider']} — "
+                  f"{preview['tracker_provider_note']}")
+    lines.append("")
+    lines.append(f"Process tier: {preview['answers']['process_tier']} — "
+                  f"{preview['process_tier_note']}")
+    lines.append("")
     lines.append("Composed review_routing.json preview:")
     lines.append(json.dumps(preview["routing_preview"], indent=2))
     lines.append("")
@@ -354,6 +399,8 @@ def main() -> int:
     parser.add_argument("--frontend", action="store_true")
     parser.add_argument("--sensitive-data", action="store_true")
     parser.add_argument("--ci-provider", choices=["github", "gitlab", "none"], default="none")
+    parser.add_argument("--tracker-provider", choices=["github", "gitlab", "none"], default="none")
+    parser.add_argument("--process-tier", choices=["solo", "standard"], default="standard")
     # Deliberately NO --unmatched-stack flag — see the module docstring for
     # why. A caller that needs `unmatched_stack_description` for something
     # other than the CLI must construct a SetupAnswers directly in Python.
@@ -365,6 +412,8 @@ def main() -> int:
         frontend=args.frontend,
         sensitive_data=args.sensitive_data,
         ci_provider=args.ci_provider,
+        tracker_provider=args.tracker_provider,
+        process_tier=args.process_tier,
     )
     print(format_preview(build_preview(answers)))
     return 0

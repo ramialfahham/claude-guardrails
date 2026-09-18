@@ -291,6 +291,357 @@ def test_readme_written_on_a_fresh_target_and_preserved_on_a_second_run():
                 "generate() must never overwrite an existing README.md")
 
 
+def test_readme_tracker_guidance_reflects_tracker_provider():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        answers = pps.SetupAnswers(dbt=True, tracker_provider="gitlab")
+        gps.generate(target, answers)
+        readme_text = open(os.path.join(target, "README.md"), encoding="utf-8").read()
+        assert "GitLab Issues" in readme_text
+        assert "ROADMAP.md" in readme_text
+        assert "<tracker guidance>" not in readme_text
+
+
+def test_standard_tier_leaves_bootstrap_working_agreement_untouched():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        before = open(wa_path, encoding="utf-8").read()
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True))
+        assert summary["working_agreement_written"] is False
+        assert "recognised standard file" in summary["working_agreement_reason"]
+        assert open(wa_path, encoding="utf-8").read() == before
+
+
+def test_solo_tier_replaces_working_agreement_with_the_lightweight_template():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"))
+        assert summary["working_agreement_written"] is True
+        assert "converted" in summary["working_agreement_reason"]
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, encoding="utf-8") as f:
+            written = f.read()
+        with open(gps._SOLO_WORKING_AGREEMENT_TMPL, encoding="utf-8") as f:
+            expected = f.read()
+        assert written == expected
+
+        # re-running with the same tier is a no-op, not a forced overwrite
+        summary2 = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"))
+        assert summary2["working_agreement_written"] is False
+        assert "already the solo template" in summary2["working_agreement_reason"]
+
+
+def test_generate_refuses_to_clobber_a_hand_customized_working_agreement_without_force():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, "w", encoding="utf-8") as f:
+            f.write("hand-written process notes\n")
+
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"))
+            assert False, "expected GenerationRefused"
+        except gps.GenerationRefused:
+            pass
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == "hand-written process notes\n"
+
+        # force=True overrides it deliberately
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"),
+                                force=True)
+        assert summary["working_agreement_written"] is True
+
+
+def test_solo_tier_can_switch_back_to_standard():
+    # the mechanism must be bidirectional: a target already on Solo must be
+    # able to converge back to Standard, not get stuck one-way
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"))
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(gps._SOLO_WORKING_AGREEMENT_TMPL, encoding="utf-8") as f:
+            solo_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == solo_text
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="standard"))
+        assert summary["working_agreement_written"] is True
+        assert "reversed a recognised prior Solo choice" in summary["working_agreement_reason"]
+        with open(gps._KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+            standard_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == standard_text
+
+
+def test_generate_fills_in_a_missing_working_agreement_both_tiers():
+    # round 6's finding: the current_working_agreement is None branch
+    # (Standard fills in a genuinely missing file) had no test at all —
+    # reachable in practice since _require_bootstrapped only requires
+    # .claude/settings.json, not working-agreement.md, to exist
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        os.remove(wa_path)
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True))
+        assert summary["working_agreement_written"] is True
+        assert "missing" in summary["working_agreement_reason"]
+        with open(gps._KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+            standard_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == standard_text
+
+        os.remove(wa_path)
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"))
+        assert summary["working_agreement_written"] is True
+        # round 7's finding: solo's reason didn't distinguish "filled a
+        # genuinely missing file" from "converted existing content" — both
+        # said "converted", falsely implying a conversion of something that
+        # never existed
+        assert "missing" in summary["working_agreement_reason"]
+        with open(gps._SOLO_WORKING_AGREEMENT_TMPL, encoding="utf-8") as f:
+            solo_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == solo_text
+
+
+def test_load_known_working_agreement_digests_refuses_loudly_on_a_broken_file():
+    # a missing/malformed shipped digests file must GenerationRefused, like
+    # every other content problem in this file — not crash with a bare
+    # exception, and not silently treat every file as unrecognised or (worse)
+    # every file as recognised
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        missing = os.path.join(tmp, "does-not-exist.json")
+        try:
+            gps._load_known_working_agreement_digests(missing)
+            assert False, "expected GenerationRefused for a missing file"
+        except gps.GenerationRefused:
+            pass
+
+        not_json = os.path.join(tmp, "not-json.json")
+        with open(not_json, "w", encoding="utf-8") as f:
+            f.write("not valid json {{{")
+        try:
+            gps._load_known_working_agreement_digests(not_json)
+            assert False, "expected GenerationRefused for malformed JSON"
+        except gps.GenerationRefused:
+            pass
+
+        wrong_shape = os.path.join(tmp, "wrong-shape.json")
+        with open(wrong_shape, "w", encoding="utf-8") as f:
+            json.dump({"digests": ["not", "a", "map"]}, f)
+        try:
+            gps._load_known_working_agreement_digests(wrong_shape)
+            assert False, "expected GenerationRefused for a non-dict digests value"
+        except gps.GenerationRefused:
+            pass
+
+        no_digests_key = os.path.join(tmp, "no-key.json")
+        with open(no_digests_key, "w", encoding="utf-8") as f:
+            json.dump({"oops": {}}, f)
+        try:
+            gps._load_known_working_agreement_digests(no_digests_key)
+            assert False, "expected GenerationRefused for a missing 'digests' key"
+        except gps.GenerationRefused:
+            pass
+
+        # round 6's finding: a typo'd tier value (e.g. "Solo"/"std") must be
+        # rejected here, not silently become a fourth _working_agreement_tier
+        # value that could make write_working_agreement and its own
+        # reported reason disagree
+        bad_tier = os.path.join(tmp, "bad-tier.json")
+        with open(bad_tier, "w", encoding="utf-8") as f:
+            json.dump({"digests": {"a" * 64: "Solo"}}, f)
+        try:
+            gps._load_known_working_agreement_digests(bad_tier)
+            assert False, "expected GenerationRefused for a tier value that isn't 'standard'/'solo'"
+        except gps.GenerationRefused:
+            pass
+
+
+def test_known_working_agreement_digests_lists_both_current_templates():
+    # the parity check: same shape as test_generated_targets_own_routing_doc_parity_test_actually_passes
+    # — if either template's content changes without appending its digest, this
+    # fails loudly instead of silently reintroducing round 1-3's version-skew bugs
+    _require_env()
+    digests = gps._load_known_working_agreement_digests()
+    with open(gps._KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+        standard_digest = hashlib.sha256(f.read().encode("utf-8")).hexdigest()
+    with open(gps._SOLO_WORKING_AGREEMENT_TMPL, encoding="utf-8") as f:
+        solo_digest = hashlib.sha256(f.read().encode("utf-8")).hexdigest()
+    assert digests.get(standard_digest) == "standard", (
+        ".claude/working-agreement.md changed without appending its new digest "
+        "to templates/known-working-agreement-digests.json")
+    assert digests.get(solo_digest) == "solo", (
+        "templates/working-agreement-solo.md.tmpl changed without appending "
+        "its new digest to templates/known-working-agreement-digests.json")
+
+
+def test_working_agreement_tier_recognises_an_older_released_default():
+    # a digest list has no version-skew problem BY CONSTRUCTION: an older
+    # released default's digest, once appended, is recognised forever,
+    # regardless of git history, clone depth, or bootstrap/kit-version timing
+    # — the whole bug class rounds 1 and 3 found in the git-reconstruction
+    # approach
+    _require_env()
+    older_content = "# Working agreement (older released default)\nolder rules\n"
+    older_digest = hashlib.sha256(older_content.encode("utf-8")).hexdigest()
+    digests = {older_digest: "standard"}
+    assert gps._working_agreement_tier(older_content, digests=digests) == "standard"
+    assert gps._working_agreement_tier("never released this text", digests=digests) is None
+
+
+def test_working_agreement_not_flagged_hand_customized_for_an_older_released_default():
+    # end-to-end through generate() itself, with a FABRICATED digest map
+    # containing the historical entry — not just the unit-level lookup —
+    # so this would actually fail if generate() stopped honouring an
+    # injected digests parameter (round 4's review caught the first version
+    # of this test asserting only the tautological unit-level lookup, then
+    # calling generate() against the REAL digest list where the content was
+    # unrecognised, so it passed for the wrong reason)
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        older_content = "# Working agreement (older released default)\nolder rules\n"
+        older_digest = hashlib.sha256(older_content.encode("utf-8")).hexdigest()
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, "w", encoding="utf-8") as f:
+            f.write(older_content)
+        fake_digests = {older_digest: "standard"}
+
+        # Standard tier must NOT touch an already-standard file, whatever vintage
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True),
+                                working_agreement_digests=fake_digests)
+        assert summary["working_agreement_written"] is False
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == older_content, (
+                "standard tier must leave an already-standard file untouched, "
+                "never opportunistically rewrite it")
+
+        # and it must not have been wrongly REFUSED as hand-customized either
+        # (that's the Solo-tier path's own gate, exercised here for the same
+        # historical entry)
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="solo"),
+                                working_agreement_digests=fake_digests)
+        assert summary["working_agreement_written"] is True
+
+
+def test_force_does_not_let_standard_tier_overwrite_a_recognised_older_vintage():
+    # round 5's finding: round 4's fix (force only overrides an UNRECOGNISED
+    # file) had no test that would fail if reverted to the broader `or
+    # force` — every existing force+standard test used either an
+    # unrecognised file or one byte-identical to the CURRENT kit default, so
+    # a spuriously-broad revert would go undetected. This constructs exactly
+    # the state the fix protects: a RECOGNISED older-standard-vintage file,
+    # different from today's default, with force=True.
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        older_content = "# Working agreement (older released default)\nolder rules\n"
+        older_digest = hashlib.sha256(older_content.encode("utf-8")).hexdigest()
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, "w", encoding="utf-8") as f:
+            f.write(older_content)
+        fake_digests = {older_digest: "standard"}
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True), force=True,
+                                working_agreement_digests=fake_digests)
+        assert summary["working_agreement_written"] is False, (
+            "force must never let Standard tier overwrite a RECOGNISED "
+            "older-standard-vintage file — only an unrecognised one")
+        assert "recognised standard file" in summary["working_agreement_reason"]
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == older_content
+
+
+def test_standard_tier_recognises_an_older_released_solo_default_as_a_prior_choice():
+    # round 3's finding #3, mirrored: Standard's "was this a prior Solo
+    # choice?" check must recognise ANY released Solo vintage, not just the
+    # CURRENT solo template — otherwise editing that template silently
+    # strands old-Solo targets on Standard's "leave it alone" path. Driven
+    # through generate() itself with an injected digest map, not just the
+    # unit-level lookup (see the comment on the sibling test above for why
+    # that distinction matters).
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        older_solo_text = "# Working agreement (older solo revision)\nolder solo rules\n"
+        older_solo_digest = hashlib.sha256(older_solo_text.encode("utf-8")).hexdigest()
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, "w", encoding="utf-8") as f:
+            f.write(older_solo_text)
+        fake_digests = {older_solo_digest: "solo"}
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True),
+                                working_agreement_digests=fake_digests)
+        assert summary["working_agreement_written"] is True, (
+            "an older released Solo default must be recognised and reversed "
+            "by Standard tier, not just the CURRENT solo template")
+        with open(gps._KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+            standard_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == standard_text
+
+
+def test_force_lets_standard_tier_overwrite_a_hand_customized_working_agreement():
+    # round 3's finding #2: --help and SKILL.md both document force as
+    # applying to working-agreement.md in EITHER tier, but the Standard
+    # write path never actually checked force — a silent no-op with no
+    # escape hatch
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        wa_path = os.path.join(target, ".claude", "working-agreement.md")
+        with open(wa_path, "w", encoding="utf-8") as f:
+            f.write("hand-written process notes\n")
+
+        # without force: standard tier is a documented no-op on a customized file
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True))
+        assert summary["working_agreement_written"] is False
+        assert "force wasn't given" in summary["working_agreement_reason"]
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == "hand-written process notes\n"
+
+        # force=True must actually restore the standard default
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True), force=True)
+        assert summary["working_agreement_written"] is True
+        assert "force-overwrote" in summary["working_agreement_reason"]
+        with open(gps._KIT_WORKING_AGREEMENT, encoding="utf-8") as f:
+            standard_text = f.read()
+        with open(wa_path, encoding="utf-8") as f:
+            assert f.read() == standard_text
+
+
+def test_generate_refuses_an_unrecognised_process_tier():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, process_tier="bogus"))
+            assert False, "expected GenerationRefused, not a silent default or a KeyError"
+        except gps.GenerationRefused:
+            pass
+
+
+def test_generate_refuses_an_unrecognised_tracker_provider():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, tracker_provider="bogus"))
+            assert False, "expected GenerationRefused, not a bare KeyError"
+        except gps.GenerationRefused:
+            pass
+
+
 def test_generate_is_idempotent_on_a_second_run():
     _require_env()
     with tempfile.TemporaryDirectory() as tmp:

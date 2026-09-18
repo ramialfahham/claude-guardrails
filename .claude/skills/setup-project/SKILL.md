@@ -29,12 +29,13 @@ set up, and stop — do not attempt the interview.
    a project — reviewer modules, routing, and the guard-paths convention. It
    writes nothing. Actual generation is a separate step, not built yet."
 
-3. Ask ONE `AskUserQuestion` call with these three questions. Every option
-   below needs both a `label` (the exact text given) and a `description`
-   (the tool requires both) — write a one-line description for each from
-   its label's own meaning; none are spelled out verbatim here to keep this
-   file from turning into a literal payload dump, but skipping the field
-   isn't valid.
+3. Ask ONE `AskUserQuestion` call with these four questions (the tool caps at
+   4 per call — the unmatched-stack question is a separate call, step 3b).
+   Every option below needs both a `label` (the exact text given) and a
+   `description` (the tool requires both) — write a one-line description for
+   each from its label's own meaning; none are spelled out verbatim here to
+   keep this file from turning into a literal payload dump, but skipping the
+   field isn't valid.
    - **Stack** (`multiSelect: true`, header "Stack"): "Which of these apply to
      this project?" — options: "Uses dbt", "Has hand-written ingestion/ETL
      code (not dbt)", "Has a frontend/UI", "Handles PII, credentials, or other
@@ -48,26 +49,47 @@ set up, and stop — do not attempt the interview.
      yet". Note in your own words that this doesn't change today's preview
      (the shipped routing already covers both) — it's collected for a later
      phase.
-   - **Unmatched stack** (header "Other area"): "Is there a significant part
-     of this project needing its own dedicated reviewer, not covered above
-     (e.g. mobile app, ML training pipeline, embedded firmware)?" —
-     options: "No, the above covers it" / "Yes, something else needs a
-     dedicated reviewer". If the user uses the tool's automatic "Other"
-     option to describe it directly, that free text is the description for
-     step 5. If instead they pick the plain "Yes, something else needs a
-     dedicated reviewer" option with no free text attached, ask ONE plain
-     follow-up question in ordinary chat text — NOT another
-     `AskUserQuestion` call, since there is no fixed set of options to offer
-     here — such as "What is it?", and use their reply as the description
-     for step 5.
+   - **Tracker** (header "Tracker"): "Which issue tracker does this project
+     use for what's ahead?" — options: "GitHub Issues", "GitLab Issues", "Not
+     decided yet". Note in your own words: the roadmap is never a markdown
+     file in this kit's convention — whichever tracker they name (or none
+     yet) is what the starter README will point at instead.
+   - **Process tier** (header "Process tier"): "How much process should this
+     project's working agreement enforce?" — options: "Standard — full
+     five-step protocol, task contracts, ADRs" (the default; the right choice
+     for a team project or anything long-lived), "Solo/small — lighter
+     working agreement, no mandatory task contract for routine changes, no
+     ADR requirement" (branch discipline and the review gate still apply
+     either way — this only changes how much process the *agent* is told to
+     add on top). If genuinely unsure which fits, say so and default to
+     Standard rather than guessing down.
+   - **Unmatched stack** — this is step 3b's own `AskUserQuestion` call, not
+     part of this one (see below).
 
-4. Translate the STACK and CI PROVIDER answers into CLI flags and run, via
-   Bash, from the repo root:
+3b. Ask a SEPARATE `AskUserQuestion` call (header "Other area"): "Is there a
+    significant part of this project needing its own dedicated reviewer, not
+    covered above (e.g. mobile app, ML training pipeline, embedded
+    firmware)?" — options: "No, the above covers it" / "Yes, something else
+    needs a dedicated reviewer". If the user uses the tool's automatic
+    "Other" option to describe it directly, that free text is the
+    description for step 5. If instead they pick the plain "Yes, something
+    else needs a dedicated reviewer" option with no free text attached, ask
+    ONE plain follow-up question in ordinary chat text — NOT another
+    `AskUserQuestion` call, since there is no fixed set of options to offer
+    here — such as "What is it?", and use their reply as the description for
+    step 5.
+
+4. Translate the STACK, CI PROVIDER, TRACKER, and PROCESS TIER answers into
+   CLI flags and run, via Bash, from the repo root:
    ```
    python scripts/preview_project_setup.py [--dbt] [--data-eng] [--frontend] \
-       [--sensitive-data] [--ci-provider github|gitlab|none]
+       [--sensitive-data] [--ci-provider github|gitlab|none] \
+       [--tracker-provider github|gitlab|none] [--process-tier solo|standard]
    ```
-   Include each boolean flag only if that option was selected.
+   Include each boolean flag only if that option was selected. "Not decided
+   yet" maps to `none` for both CI provider and tracker; "Standard" maps to
+   the `--process-tier` default (omit the flag) and "Solo/small" maps to
+   `--process-tier solo`.
 
    **The CLI has no flag for the unmatched-stack answer, and never pass it
    as an argument to any command regardless.** It is free text a user typed
@@ -119,20 +141,28 @@ set up, and stop — do not attempt the interview.
    "Generate these files into `<target>` now? This writes real files:
    reviewer modules into `.claude/agents/`, a composed
    `.claude/review_routing.json`, a rendered `.claude/rules/guard-paths.md`,
-   and `README.md` if none exists yet." — options: "Yes, generate now" /
-   "No, stop here". If no: stop — the preview from steps 1-6 already showed
-   what would happen; nothing has been written.
+   `README.md` if none exists yet, and — if Solo/small tier was chosen, the
+   project is currently on Solo and Standard was chosen to switch it back,
+   or `working-agreement.md` doesn't exist yet — a written or replaced
+   `.claude/working-agreement.md`. Standard never rewrites an EXISTING,
+   already-standard file (whatever kit version it came from) — only Solo, an
+   explicit switch back from Solo, or filling in a missing file, ever
+   touches it." — options: "Yes, generate now" / "No, stop here". If no:
+   stop — the preview from steps 1-6 already showed what would happen;
+   nothing has been written.
 
 10. If yes: run, via Bash, from the repo root:
     ```
     python scripts/generate_project_setup.py --target "<target>" [--dbt] \
         [--data-eng] [--frontend] [--sensitive-data] \
-        [--ci-provider github|gitlab|none]
+        [--ci-provider github|gitlab|none] \
+        [--tracker-provider github|gitlab|none] [--process-tier solo|standard]
     ```
-    using the SAME flags step 4 already derived from the STACK/CI PROVIDER
-    answers. Never add `--force` yourself — it exists to deliberately
-    overwrite a `review_routing.json`/`guard-paths.md` that already looks
-    hand-customized, which is an owner decision the interview must never
+    using the SAME flags step 4 already derived from the STACK/CI
+    PROVIDER/TRACKER/PROCESS TIER answers. Never add `--force` yourself — it
+    exists to deliberately overwrite a
+    `review_routing.json`/`guard-paths.md`/`working-agreement.md` that already
+    looks hand-customized, which is an owner decision the interview must never
     make silently on their behalf. Show its stdout VERBATIM — same "the
     script is the source of truth, never re-narrate its output" rule as
     step 5 — but ALSO check its exit code and stderr: a nonzero exit means
@@ -145,7 +175,13 @@ set up, and stop — do not attempt the interview.
 
 11. Close by restating plainly, in your own words: what was generated (the
     module list, whether the old `cto-reviewer.md` was removed, whether
-    `README.md` was written or already existed and was left alone), and
-    whether the smoke test confirmed the review gate fires for this project
-    — or, if it was skipped or failed, say so exactly, never imply success
-    it didn't earn.
+    `README.md` was written or already existed and was left alone, and
+    whether `working-agreement.md` was replaced or left alone). For
+    `working-agreement.md` specifically, quote the script's own printed
+    reason verbatim (its stdout line reads `working-agreement.md written:
+    True/False (<reason>)`) — never guess or paraphrase a reason yourself,
+    since there are more cases than "Solo changed it" / "Standard left it
+    alone" (e.g. a hand-customized file left alone with no `--force`, which
+    this skill never passes). Also say whether the smoke test confirmed the
+    review gate fires for this project — or, if it was skipped or failed,
+    say so exactly, never imply success it didn't earn.

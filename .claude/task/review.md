@@ -1,56 +1,53 @@
 # Review
 
-diff_sha256: eae0dd07e0bdf10a5128a0a447a3d775eb2db8ac65ed6ef52784b73dc624a4ac
+diff_sha256: a373e17ed4a6b7b579151d3b0ca18883e90f0698a95208d8955c985db385c98a
 
-rounds: 3
+rounds: 12
 
-CPO ANSWER: not needed — round 3 PASSed clean on both required reviewers; the round count
-reflects two genuine process/content FAILs (see `.claude/task/contract.md`'s amendments log
-for the full account: round 1 caught a missing task contract, a missing review_input.patch,
-a stale review.md, an internally-contradictory active_work.md, and a stale repo name in
-preflight.sh; round 2 caught scope_paths omitting the contract file itself plus two stale
-"cto-reviewer is this kit's current name" comments in test files, and active_work.md claiming
-merged/done state for an unreviewed branch), not an unbounded reviewer disagreement.
+CPO ANSWER: round 3's cap was hit on the working-agreement.md mechanism specifically (three
+FAILs, all real defects in a git-history-based recognition design). Owner authorized a full
+rebuild on a static digest list rather than a fourth patch — see `.claude/task/contract.md`'s
+amendments log for the complete round-by-round account, including two further CPO ANSWERs
+(round 3's rebuild authorization, round 6's confirmation that a reason-string fix stayed
+in scope). Every round past the cap found a real, shrinking-severity defect: rounds 1-3
+found silent-data-loss-class bugs in the original design; round 4's rebuild itself needed
+correction for the same reason; rounds 5-8 found coverage gaps and doc/reason accuracy
+issues, including the ADR itself repeating the exact stale-doc pattern this whole feature
+exists to prevent (fixed by trimming it structurally rather than patching narrative);
+rounds 9-11 found the same self-referential defect recurring in smaller spots plus one real
+preview-note overclaim. Round 12 (both reviewers) is clean.
 
 ## scope-auditor
-VERDICT: PASS
+VERDICT: PASS (round 12, final)
 risks_checked:
-- Scope coverage: all files in the patch match `contract.md`'s `scope_paths`; nothing
-  outside it, nothing missing from it.
-- Internal consistency: `active_work.md` no longer lists the retired items as both done and
-  open, and correctly frames this work as in-flight on this branch, not yet merged.
-- Decisions reserved: the repo-rename choice, the cto-reviewer/platform-reviewer
-  naming-collision resolution, and the dbt-agent-kit cross-repo boundary are all recorded as
-  owner decisions, not silently made.
-- Cross-repo boundary: zero changes to `dbt-agent-kit` or any other repo; the
-  `sync-base.sh` fix is flagged there as a separate task (`task_5ad700d5`), not done here.
-- Doc-sync: README.md, CLAUDE.md, docs/project-kit-design.md, and guard-paths.md all
-  consistently reflect both the rename and the reviewer retirement.
+- Scope: all 14 changed files match `contract.md`'s `scope_paths` exactly, no drift.
+- `decisions_reserved` accurately reflects what was actually escalated across all 12 rounds
+  (build authorization, football-data-pipeline generalization check, this repo staying
+  Standard-only, plus the two mid-review CPO ANSWERs) — nothing decided silently.
+- Cross-repo boundary: zero changes to `football-data-pipeline`, `dbt-agent-kit`, or any
+  other repo.
+- Digest-list sync obligation is build-gated: `test_known_working_agreement_digests_lists_both_current_templates`
+  fails loudly if either template changes without its digest appended — same guard shape as
+  `test_routing_doc_parity.py`.
+- Asymmetric tier-switching correctness: bidirectional conversion, recognition of historical
+  digests, and force-flag scoping (overrides only unrecognised files, never a recognised
+  standard file of any vintage) are all covered by dedicated tests matching the actual
+  branches in `generate()`.
 
 ## platform-reviewer
-VERDICT: PASS
+VERDICT: PASS (round 12, final — opus, guard paths touched: scripts/*, .claude/tests/*,
+.claude/skills/*)
 risks_checked:
-- Fail-closed integrity of the renamed review route: `commit_review_gate.py`'s `_gate()`
-  fails open only on "nothing staged" or "no routing file," and blocks on a required
-  reviewer section missing a verdict — so the rename can't silently disable the gate, and a
-  stale-name review.md would be rejected, not accepted. Routing (`review_routing.json`),
-  the agent file (`.claude/agents/platform-reviewer.md`), and the doc
-  (`.claude/rules/guard-paths.md`, parity-tested by `test_routing_doc_parity.py`) are all
-  consistent.
-- Re-run safety and real test coverage of the retired legacy file:
-  `generate_project_setup.py`'s legacy-file delete is `os.path.isfile`-guarded and
-  idempotent; both branches (fresh bootstrap never creates the legacy file vs. a
-  pre-rename project's stale copy gets cleaned up) are covered by tests that would fail on
-  revert, and the new test is actually discovered and run by the test files'
-  `globals()`-based `__main__` runner, not silently unregistered.
-- No new mechanism, dependency, or CI permission change anywhere in the diff — one deleted
-  agent file, one added (byte-identical to the module template), routing values renamed, one
-  new test, the rest prose.
+- Full fresh hunt-list pass found nothing new: no new dependency beyond stdlib
+  (`hashlib`/`json`/`re`), no CI/hook/permission/credential change, re-run and interruption
+  safety intact (every refusal precedes the first write; both tiers converge to a no-op on
+  re-run), fail-closed direction correct for a generator (a broken digest file raises
+  `GenerationRefused`, never silently treats content as recognised).
+- All 12 rounds' fixes verified present and consistent: the digest-based recognition
+  mechanism (no git subprocess, no `.kit-version` dependency), the asymmetric write logic
+  with force scoped to unrecognised files only, the `working_agreement_reason` string
+  structurally unable to disagree with the write decision, and full doc consistency across
+  `SKILL.md`, `README.md`, `docs/project-kit-design.md`, and the (now-trimmed, ~85-line) ADR.
+- No stale self-referential round-count language survives anywhere in the diff.
 
-Full test suite: 205 passed, 0 failed (`python -m pytest .claude/tests/ -q`).
-
-Non-blocking note for the owner (not a defect, flagged not waved through): the README CI
-badge was swapped from GitHub Actions to the GitLab pipeline (accurate — `.gitlab-ci.yml`
-runs the full suite on `main` and MRs) as part of the repo-name-reference cleanup. This
-changes which CI is advertised as authoritative; `.github/workflows/ci.yml` is untouched and
-stays in-tree, now unadvertised. Whether to retire that workflow file is an owner call.
+Full test suite: 226 passed, 0 failed (`python -m pytest .claude/tests/ -q`).

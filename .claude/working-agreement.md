@@ -25,10 +25,16 @@ merged MR descriptions, not here.
 ## 2. The task contract + review cycle
 
 Before a non-trivial change, write `.claude/task/contract.md` (template:
-`CONTRACT_TEMPLATE.md`): objective, `scope_paths` (the files this task may touch),
-`decisions_reserved` (owner-only questions — §6), `done_when`. Commit it with the
-branch so it is visible in the PR. The scope-auditor reviewer flags any edit outside
+`CONTRACT_TEMPLATE.md`): objective, `tracking_issue`, `scope_paths` (the files this task
+may touch), `decisions_reserved` (owner-only questions — §6), `done_when`. Commit it with
+the branch so it is visible in the PR. The scope-auditor reviewer flags any edit outside
 `scope_paths` at review time.
+
+**The roadmap has one home: the project's issue tracker** (GitHub/GitLab Issues,
+milestones/epics) — never a `ROADMAP.md`/`BACKLOG.md` file. A markdown file narrating
+what's ahead goes stale the moment two of them disagree, and nothing then tells you which
+one is current. Link the relevant issue in `tracking_issue`; if this project has no
+tracker, say so explicitly rather than inventing a file to fill the gap.
 
 Before committing, run the review cycle (the commit gate enforces it):
 
