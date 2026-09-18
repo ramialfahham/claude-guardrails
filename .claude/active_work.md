@@ -7,15 +7,16 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-**Branch `feat/review-round-completeness` — committed, MR open on GitLab, awaiting owner
-merge.** The review-process fix the owner chose ("now, go") after MR !33's diagnosis: (A) every
-reviewer module in `templates/reviewers/` and both `.claude/agents/*.md` now carry a
-"Round completeness" verdict rule — report every finding per round, and label a finding that
-was present in round 1's diff as a review miss; (B) both working agreements (§2) now make the
-builder check any claim about code behaviour against source before spawning reviewers, and
-fix a round's findings together; both new digests appended to
-`templates/known-working-agreement-digests.json`. (C) The 3-round cap is untouched on
-purpose — revisit only if A + B don't drop round counts. No hook/script/test-logic changes.
+Nothing is in flight. Most recent merge —
+[MR !35](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/35): the
+review-process fix chosen after MR !33's diagnosis. (A) every reviewer module in
+`templates/reviewers/` and both `.claude/agents/*.md` carry a "Round completeness" verdict rule
+(report every finding per round; a finding present since round 1 is labelled a review miss —
+round context comes from the contract's `amendments`) and a "Claims against source" hunt item;
+(B) both working agreements §2 make the builder check code-behaviour claims against source
+before spawning and record each round in the contract before re-spawning; (C) the 3-round cap
+is untouched on purpose — **revisit only if the next branches still hit the cap.** MR !35
+itself took 3 rounds, within the cap, and the new rule fired on its own author in round 2.
 
 Owner confirmed 4 items to do before moving to the website-project test; 3 of 4 are merged —
 [MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31) (CI-audit
@@ -41,7 +42,8 @@ rebuild) found a real coupling bug with `bootstrap.sh`'s own conventions. Full a
 
 Also merged in the same wave: this repo was renamed
 `claude-guardrails` → `claude-project-kit` (`rami.al-fahham/claude-project-kit` on GitLab;
-local `gitlab` remote repointed), and this kit's own self-governance reviewer,
+local `gitlab` remote repointed; GitHub followed on 2026-09-18 — see below), and this kit's own
+self-governance reviewer,
 `.claude/agents/cto-reviewer.md`, was retired in favor of using
 `templates/reviewers/platform-reviewer.md` directly (a straight rename would have collided by
 filename with that already-existing module) —
@@ -49,14 +51,18 @@ filename with that already-existing module) —
 `dbt-agent-kit`'s `scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate
 follow-up task in that repo (`task_5ad700d5`), deliberately not fixed here (cross-repo).
 
-The `origin` GitHub remote (`ramialfahham/claude-guardrails`) came back after its 2026-09-17
-suspension. GitLab (`claude-project-kit`) stays primary for all active work — MRs, CI, reviews.
-GitHub is now a GitLab-native push mirror (Settings → Repository → Mirroring repositories,
-protected branches only), auto-syncing on every push; confirmed healthy via GitLab's API
-(`update_status: "finished"`, no error) and a matching `main` SHA on both remotes as of
-2026-09-18. No manual sync needed going forward — don't re-flag GitHub as dead, and don't push
-to it directly (the mirror handles it, and `branch_discipline.py` blocks a direct `main` push
-to any remote regardless).
+The `origin` GitHub remote came back after its 2026-09-17 suspension and was renamed to
+`ramialfahham/claude-project-kit` on 2026-09-18 (owner-approved; local `origin` repointed).
+GitHub redirects the old `claude-guardrails` URL until someone creates a new repo under that
+name. Still on the old URL, both working via that redirect: the GitLab push-mirror target
+(updating it means re-entering the mirror token in GitLab's UI — owner's call, not urgent) and
+`dbt-agent-kit`'s `scripts/sync-base.sh` (that repo's own follow-up). The local folder is still
+`D:\Projects\claude-guardrails`; renaming it moves the Claude Code project-memory path, so
+that's an owner action outside a session, if ever. GitLab (`claude-project-kit`) stays primary
+for all active work — MRs, CI, reviews. GitHub is a GitLab-native push mirror (protected
+branches only), auto-syncing on every push — `main` SHAs matched on both remotes right after
+the rename. Don't re-flag GitHub as dead, and don't push to it directly (the mirror handles it,
+and `branch_discipline.py` blocks a direct `main` push to any remote regardless).
 
 - The 7-phase `claude-project-kit` build (bootstrap + tailored `/setup-project` generation,
   reviewer module library, CI-provider audit) — complete. See `docs/project-kit-design.md`
