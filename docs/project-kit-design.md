@@ -63,6 +63,12 @@ scanner).
    unrecognised one — it never opportunistically "modernizes" an
    already-standard file that merely predates the current kit release. See
    [`docs/decisions/tracker-convention-and-process-tier.md`](decisions/tracker-convention-and-process-tier.md).
+   If the interview was given a CI provider, generation also installs
+   `templates/ci-audit/ci_automation_audit.py` into `.claude/hooks/` and
+   idempotently wires it as a `SessionStart` hook in `.claude/settings.json`
+   — an advisory scan for a workflow combining a schedule/dispatch trigger
+   with an auto-merge action, the shape of a real incident this kit's own
+   `scripts/audit_ci_automation.py` was built to catch.
 3. Generation ends with a smoke test: it runs the target's own
    newly-generated `commit_review_gate.py` as a real subprocess with a
    simulated commit event, proving the gate actually denies an unreviewed

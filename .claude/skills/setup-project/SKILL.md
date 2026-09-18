@@ -147,9 +147,13 @@ set up, and stop — do not attempt the interview.
    `.claude/working-agreement.md`. Standard never rewrites an EXISTING,
    already-standard file (whatever kit version it came from) — only Solo, an
    explicit switch back from Solo, or filling in a missing file, ever
-   touches it." — options: "Yes, generate now" / "No, stop here". If no:
-   stop — the preview from steps 1-6 already showed what would happen;
-   nothing has been written.
+   touches it. And — only if a CI provider was given, not 'not decided yet'
+   — `templates/ci-audit/ci_automation_audit.py` copied into
+   `.claude/hooks/` and wired as a `SessionStart` hook in
+   `.claude/settings.json` (idempotent — a second run never duplicates the
+   entry)." — options: "Yes, generate now" / "No, stop here". If no: stop —
+   the preview from steps 1-6 already showed what would happen; nothing has
+   been written.
 
 10. If yes: run, via Bash, from the repo root:
     ```
@@ -182,6 +186,12 @@ set up, and stop — do not attempt the interview.
     True/False (<reason>)`) — never guess or paraphrase a reason yourself,
     since there are more cases than "Solo changed it" / "Standard left it
     alone" (e.g. a hand-customized file left alone with no `--force`, which
-    this skill never passes). Also say whether the smoke test confirmed the
-    review gate fires for this project — or, if it was skipped or failed,
-    say so exactly, never imply success it didn't earn.
+    this skill never passes). If a CI provider was given, also say whether
+    `ci_automation_audit.py` was installed and wired (quote its own two
+    stdout lines the same way — `installed: True/False` and `wired into
+    settings.json: True/False (<reason>)`; the reason distinguishes "already
+    wired by a prior run or a hand-edit" from "no CI provider given", which
+    the bare `wired: False` alone can't).
+    Also say whether the smoke test confirmed the review gate fires for this
+    project — or, if it was skipped or failed, say so exactly, never imply
+    success it didn't earn.

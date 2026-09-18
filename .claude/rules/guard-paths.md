@@ -4,7 +4,10 @@ These paths ARE this repo's own review/governance mechanism — the hooks that
 gate every commit, the reviewer agents, the routing that decides which
 reviewer runs, and the CI that backstops all of it. A defect here doesn't
 just ship a bug; it can silently weaken or disable the thing that's supposed
-to catch defects in the first place.
+to catch defects in the first place. `templates/*` earns its place for the
+same reason at one remove: it's the content `/setup-project` copies into
+every OTHER project this kit sets up, so a defect there ships broken
+governance everywhere at once, not just here.
 
 **Convention**: when a diff you're about to send for review touches any path
 in the list below, spawn the required reviewer(s) — currently `platform-reviewer`,
@@ -28,7 +31,10 @@ a reviewer was actually spawned at the promoted model.
 - scripts/*
 - .claude/tests/*
 - .github/workflows/*
+- .gitlab-ci.yml
 - requirements*.txt
+- package*.json
+- templates/*
 - *hooks/*
 - .claude/agents/*
 - .claude/commands/*

@@ -438,6 +438,18 @@ def test_ci_provider_is_recorded_but_does_not_affect_selection():
     assert with_github == with_gitlab == with_none
 
 
+def test_ci_provider_note_describes_the_hook_wiring_generate_actually_does():
+    # the note used to say "recorded for later use" — that later use now
+    # exists (generate() installs + wires ci_automation_audit.py), so the
+    # note must describe it, not the old placeholder wording
+    _require_script()
+    with_provider = pps.build_preview(pps.SetupAnswers(ci_provider="gitlab"))["ci_provider_note"]
+    assert "ci_automation_audit.py" in with_provider
+    assert "SessionStart" in with_provider
+    without_provider = pps.build_preview(pps.SetupAnswers(ci_provider="none"))["ci_provider_note"]
+    assert "nothing is wired" in without_provider
+
+
 def test_tracker_provider_is_recorded_but_does_not_affect_selection():
     _require_script()
     with_github = pps.select_reviewer_modules(pps.SetupAnswers(tracker_provider="github"))

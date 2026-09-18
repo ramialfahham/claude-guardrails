@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 """SessionStart hook TEMPLATE — advisory-only static CI-automation scan.
 
-Not wired into any project yet (inert, same status as the other
-`templates/` content until a future phase's interview/generation logic
-copies and wires it). If you copy this into a project's `.claude/hooks/`
-and register it as a `SessionStart` hook in `.claude/settings.json`, it
-prints a non-blocking context note at the start of a session if any
-`.github/workflows/*.yml` or `.gitlab-ci.yml` file combines a
-schedule/dispatch trigger with an auto-merge action — the actual shape of a
-real incident (see `scripts/audit_ci_automation.py` in `claude-project-kit`
-for the full writeup and the heavier, deliberately-run tool this is a
-lightweight cousin of).
+`scripts/generate_project_setup.py` copies this into a project's
+`.claude/hooks/` and wires it as a `SessionStart` hook whenever the
+`/setup-project` interview is given a CI provider (GitHub or GitLab) — see
+that script's `_prepare_ci_audit_hook_settings`. If a project skips the
+interview (plain `bootstrap.sh` only) or answers "not decided yet" for CI
+provider, this file is never copied and stays purely template content, same
+as the rest of `templates/`. Once wired, it prints a non-blocking context
+note at the start of a session if any `.github/workflows/*.yml` or
+`.gitlab-ci.yml` file combines a schedule/dispatch trigger with an
+auto-merge action — the actual shape of a real incident (see
+`scripts/audit_ci_automation.py` in `claude-project-kit` for the full
+writeup and the heavier, deliberately-run tool this is a lightweight
+cousin of).
 
 Deliberately STATIC-SCAN ONLY — no `gh`/`glab` live API calls here. A
 `SessionStart` hook runs on every session; a live check needs auth and a

@@ -26,6 +26,17 @@ file, or when `force=True`; an existing file that's already some vintage of
 standard is otherwise deliberately left untouched, never opportunistically
 "modernized" to this checkout's current text.
 
+Also, when `answers.ci_provider != "none"`, copies
+`templates/ci-audit/ci_automation_audit.py` into `TARGET/.claude/hooks/`
+(plain overwrite, same as reviewer modules — no hand-customization check,
+it's a leaf tool file meant to always match what the kit ships) and
+idempotently splices a `SessionStart` entry for it into `TARGET/.claude/settings.json`'s
+first hook group, if not already present — see
+`_prepare_ci_audit_hook_settings` for the validate-then-write split that
+keeps this consistent with every other check here (a malformed
+`settings.json` refuses generation with nothing written, never guesses at
+a structure to bolt onto the file that wires every hook in the project).
+
 That asymmetry, and the digest-list recognition mechanism itself, are both
 the product of review catching real defects across several rounds — several
 of them past this repo's 3-round cap, explicitly owner-authorized (see
@@ -96,6 +107,11 @@ _SOLO_WORKING_AGREEMENT_TMPL = os.path.join(
     _REPO_ROOT, "templates", "working-agreement-solo.md.tmpl")
 _WORKING_AGREEMENT_DIGESTS_FILE = os.path.join(
     _REPO_ROOT, "templates", "known-working-agreement-digests.json")
+_CI_AUDIT_HOOK_TMPL = os.path.join(
+    _REPO_ROOT, "templates", "ci-audit", "ci_automation_audit.py")
+_CI_AUDIT_HOOK_MARKER = "ci_automation_audit.py"  # substring match on a
+# SessionStart hook's "command" field — how _prepare_ci_audit_hook_settings
+# tells "already wired" from "needs adding", idempotently
 
 sys.path.insert(0, _SCRIPTS_DIR)
 import compose_routing  # noqa: E402
@@ -316,6 +332,83 @@ def _require_bootstrapped(target: str) -> None:
             "is additive on top of bootstrap, not a replacement for it")
 
 
+def _prepare_ci_audit_hook_settings(settings_path: str) -> str | None:
+    """Read-and-validate half of wiring the CI-audit SessionStart entry into
+    settings.json — deliberately does NOT write. Returns the new file text
+    to write (caller writes it atomically in generate()'s write phase), or
+    `None` if an entry referencing `_CI_AUDIT_HOOK_MARKER` is already present
+    anywhere in SessionStart (idempotent — re-running generate() converges,
+    never duplicates).
+
+    Raises GenerationRefused — never crashes or corrupts the file — if
+    settings.json is missing, isn't valid JSON, or doesn't have the
+    {"hooks": {"SessionStart": [{"hooks": [...]}]}} shape this kit's own
+    bootstrap.sh always ships: settings.json wires every hook in the
+    project, the highest blast-radius file this tool touches, so an
+    unexpected shape stops generation outright rather than guessing at a
+    structure to bolt onto. Split from the write itself so generate()'s own
+    invariant holds here too: every possible GenerationRefused fires before
+    the first byte of ANY file is written, not just this one."""
+    _remedy = (
+        "add a \"hooks\": {\"SessionStart\": [{\"hooks\": [...]}]} block to "
+        "settings.json by hand (see .claude/settings.json in a fresh "
+        "bootstrap for the shape), or re-run with --ci-provider none to "
+        "skip the CI-audit hook entirely")
+    try:
+        with open(settings_path, encoding="utf-8") as f:
+            data = json.load(f)
+    # ValueError, not just JSONDecodeError: a non-UTF-8 file (UTF-16 with a
+    # BOM is what PowerShell 5.1's Out-File writes by default) raises
+    # UnicodeDecodeError, which is a ValueError but NOT a JSONDecodeError
+    except (OSError, ValueError) as e:
+        raise GenerationRefused(
+            f"{settings_path} is missing or malformed ({e!r}) — nothing "
+            f"written. {_remedy}") from e
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        raise GenerationRefused(
+            f"{settings_path} has no top-level \"hooks\" object — this "
+            f"tool only knows how to add to the shape bootstrap.sh ships; "
+            f"nothing written. {_remedy}")
+    session_start = hooks.get("SessionStart")
+    if not isinstance(session_start, list) or not session_start:
+        raise GenerationRefused(
+            f"{settings_path}'s hooks.SessionStart isn't a non-empty list "
+            f"— nothing written. {_remedy}")
+    first_group = session_start[0]
+    if not isinstance(first_group, dict) or not isinstance(first_group.get("hooks"), list):
+        raise GenerationRefused(
+            f"{settings_path}'s hooks.SessionStart[0] has no \"hooks\" "
+            f"list — nothing written. {_remedy}")
+    # Defensive, not just first_group: a LATER group, or an entry inside any
+    # group, having an unexpected shape (not a dict; "hooks" not a list) must
+    # never crash the scan — that would break the "never crashes" promise
+    # this function's own docstring makes. Treating an unrecognisable group
+    # as "no match here" is safe either way: worst case is a redundant
+    # append, never a lost detection of a genuine duplicate, since the ONLY
+    # group ever appended to is first_group, which IS validated above.
+    for group in session_start:
+        if not isinstance(group, dict):
+            continue
+        group_hooks = group.get("hooks")
+        if not isinstance(group_hooks, list):
+            continue
+        for h in group_hooks:
+            if isinstance(h, dict) and _CI_AUDIT_HOOK_MARKER in str(h.get("command", "")):
+                return None
+    first_group["hooks"].append({
+        "type": "command",
+        "shell": "bash",
+        "command": (
+            f'python "${{CLAUDE_PROJECT_DIR}}/.claude/hooks/{_CI_AUDIT_HOOK_MARKER}"'),
+        "statusMessage": "Scanning CI config for schedule+auto-merge risk...",
+    })
+    # ensure_ascii=False: this is a PROJECT-OWNED file (bootstrap.sh keep_file),
+    # so a non-ASCII statusMessage the owner wrote must round-trip as-is, not
+    # be rewritten to \uXXXX escapes as a side effect of one append.
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
 def _render_guard_paths(tmpl_path: str, guard_preview: dict) -> str:
     """Fill templates/rules/guard-paths.md.tmpl's <REPLACE: ...> markers and
     placeholder list from `build_guard_paths_preview`'s own output — never a
@@ -395,20 +488,23 @@ def generate(target: str, answers: SetupAnswers,
              force: bool = False) -> dict:
     """Write the tailored governance setup into `target`. Raises
     GenerationRefused with NOTHING written if any of: `target` isn't
-    bootstrapped; a selected module fails the naming lint; `answers.process_tier`
-    or `answers.tracker_provider` isn't a recognised value; `target`'s
-    `review_routing.json` or `guard-paths.md` already look hand-customized
-    and `force` isn't set; `answers.process_tier == "solo"` and
+    bootstrapped; a selected module fails the naming lint; `answers.process_tier`,
+    `answers.tracker_provider`, or `answers.ci_provider` isn't a recognised
+    value; `target`'s `review_routing.json` or `guard-paths.md` already look
+    hand-customized and `force` isn't set; `answers.process_tier == "solo"` and
     `working-agreement.md` already looks hand-customized (its digest isn't in
     `templates/known-working-agreement-digests.json`) and `force` isn't set
     (Standard never needs this check — see the module docstring's asymmetry
     note: it only ever converts FROM a recognised Solo state, or writes when
-    `force=True`, never clobbers an unrecognised file on its own); either
+    `force=True`, never clobbers an unrecognised file on its own);
+    `answers.ci_provider != "none"` and `target`'s `settings.json` doesn't
+    have the `{"hooks": {"SessionStart": [{"hooks": [...]}]}}` shape
+    bootstrap.sh always ships (see `_prepare_ci_audit_hook_settings`); either
     template has drifted from what this file's renderers expect. Every one
-    of those checks — including rendering both templates — runs before the
-    first write, so a refusal never leaves a half-generated target. Returns
-    a summary dict for a caller (the CLI, the skill) to print verbatim
-    rather than re-narrate.
+    of those checks — including rendering both templates and preparing the
+    settings.json edit — runs before the first write, so a refusal never
+    leaves a half-generated target. Returns a summary dict for a caller (the
+    CLI, the skill) to print verbatim rather than re-narrate.
 
     `force=True` overwrites an already-customized review_routing.json/
     guard-paths.md deliberately — the same escape hatch bootstrap.sh's own
@@ -454,6 +550,10 @@ def generate(target: str, answers: SetupAnswers,
     if answers.tracker_provider not in _PROVIDER_DISPLAY_NAME and answers.tracker_provider != "none":
         raise GenerationRefused(
             f"answers.tracker_provider={answers.tracker_provider!r} is not "
+            "'github', 'gitlab', or 'none' — nothing written")
+    if answers.ci_provider not in _PROVIDER_DISPLAY_NAME and answers.ci_provider != "none":
+        raise GenerationRefused(
+            f"answers.ci_provider={answers.ci_provider!r} is not "
             "'github', 'gitlab', or 'none' — nothing written")
     if (answers.process_tier == "solo" and not force
             and _working_agreement_needs_force(target, digests=working_agreement_digests)):
@@ -548,6 +648,23 @@ def generate(target: str, answers: SetupAnswers,
                 "standard: file is unrecognised (hand-customized) and force wasn't "
                 "given — left as-is")
 
+    ci_audit_settings_path = os.path.join(target, ".claude", "settings.json")
+    ci_audit_new_settings = (  # may raise
+        _prepare_ci_audit_hook_settings(ci_audit_settings_path)
+        if answers.ci_provider != "none" else None)
+    # Decided together with the write, same reasoning as working_agreement_reason
+    # above (round 6's own lesson): "wired: False" is genuinely ambiguous on
+    # its own — it covers "no CI provider given", "already wired by a prior
+    # generate() run", and "already hand-wired independently", three states
+    # a caller quoting only the boolean can't tell apart.
+    if answers.ci_provider == "none":
+        ci_audit_hook_reason = "no CI provider given — hook not installed"
+    elif ci_audit_new_settings is not None:
+        ci_audit_hook_reason = "installed and wired into settings.json"
+    else:
+        ci_audit_hook_reason = (
+            "already wired (a prior run or a hand-edit already added the entry)")
+
     # Nothing above this point has written anything. From here on, only
     # operations that (by construction) cannot themselves fail on content.
     summary: dict = {
@@ -557,6 +674,9 @@ def generate(target: str, answers: SetupAnswers,
         "readme_written": False,
         "working_agreement_written": False,
         "working_agreement_reason": working_agreement_reason,
+        "ci_audit_hook_installed": False,
+        "ci_audit_hook_wired": False,
+        "ci_audit_hook_reason": ci_audit_hook_reason,
     }
 
     agents_dir = os.path.join(target, ".claude", "agents")
@@ -594,6 +714,19 @@ def generate(target: str, answers: SetupAnswers,
     if write_working_agreement:
         compose_routing._write_atomic(wa_path, desired_working_agreement)
         summary["working_agreement_written"] = True
+
+    if answers.ci_provider != "none":
+        # Plain overwrite, no hand-customization check — same as the
+        # reviewer modules above: this is a leaf tool file meant to always
+        # match what the kit ships, not something a project owner is
+        # expected to hand-edit in place.
+        hooks_dir = os.path.join(target, ".claude", "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        shutil.copyfile(_CI_AUDIT_HOOK_TMPL, os.path.join(hooks_dir, _CI_AUDIT_HOOK_MARKER))
+        summary["ci_audit_hook_installed"] = True
+        if ci_audit_new_settings is not None:
+            compose_routing._write_atomic(ci_audit_settings_path, ci_audit_new_settings)
+            summary["ci_audit_hook_wired"] = True
 
     return summary
 
@@ -785,6 +918,9 @@ def main() -> int:
     print(f"  README.md written: {summary['readme_written']}")
     print(f"  working-agreement.md written: {summary['working_agreement_written']} "
           f"({summary['working_agreement_reason']})")
+    print(f"  ci_automation_audit.py installed: {summary['ci_audit_hook_installed']}")
+    print(f"  ci_automation_audit.py wired into settings.json: {summary['ci_audit_hook_wired']} "
+          f"({summary['ci_audit_hook_reason']})")
 
     try:
         smoke = smoke_test(args.target)

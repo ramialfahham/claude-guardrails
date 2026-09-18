@@ -642,6 +642,242 @@ def test_generate_refuses_an_unrecognised_tracker_provider():
             pass
 
 
+def test_generate_refuses_an_unrecognised_ci_provider():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="bogus"))
+            assert False, "expected GenerationRefused, not a bare KeyError"
+        except gps.GenerationRefused:
+            pass
+
+
+def _session_start_hooks(target: str) -> list[dict]:
+    with open(os.path.join(target, ".claude", "settings.json"), encoding="utf-8") as f:
+        data = json.load(f)
+    return data["hooks"]["SessionStart"][0]["hooks"]
+
+
+def test_ci_audit_hook_installed_and_wired_when_ci_provider_given():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="gitlab"))
+        assert summary["ci_audit_hook_installed"] is True
+        assert summary["ci_audit_hook_wired"] is True
+        assert summary["ci_audit_hook_reason"] == "installed and wired into settings.json"
+        hook_path = os.path.join(target, ".claude", "hooks", "ci_automation_audit.py")
+        assert os.path.isfile(hook_path)
+        with open(gps._CI_AUDIT_HOOK_TMPL, encoding="utf-8") as f:
+            expected = f.read()
+        with open(hook_path, encoding="utf-8") as f:
+            assert f.read() == expected
+        commands = [h["command"] for h in _session_start_hooks(target)]
+        assert any("ci_automation_audit.py" in c for c in commands)
+
+
+def test_ci_audit_hook_not_installed_when_ci_provider_is_none():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True))  # ci_provider default "none"
+        assert summary["ci_audit_hook_installed"] is False
+        assert summary["ci_audit_hook_wired"] is False
+        assert summary["ci_audit_hook_reason"] == "no CI provider given — hook not installed"
+        assert not os.path.isfile(
+            os.path.join(target, ".claude", "hooks", "ci_automation_audit.py"))
+        commands = [h["command"] for h in _session_start_hooks(target)]
+        assert not any("ci_automation_audit.py" in c for c in commands)
+
+
+def test_ci_audit_hook_wiring_is_idempotent_on_a_second_run():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+        first_commands = [h["command"] for h in _session_start_hooks(target)]
+        summary2 = gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+        assert summary2["ci_audit_hook_wired"] is False, (
+            "an already-wired entry must not be duplicated on a second run")
+        assert summary2["ci_audit_hook_installed"] is True, (
+            "the hook FILE is still refreshed on every run, like reviewer modules")
+        assert summary2["ci_audit_hook_reason"] == (
+            "already wired (a prior run or a hand-edit already added the entry)")
+        second_commands = [h["command"] for h in _session_start_hooks(target)]
+        assert first_commands == second_commands
+        assert sum("ci_automation_audit.py" in c for c in second_commands) == 1
+
+
+def test_ci_audit_hook_left_alone_if_already_hand_wired():
+    # simulates a project owner who already wired the hook by hand before
+    # ever running /setup-project with a ci_provider answer
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        settings_path = os.path.join(target, ".claude", "settings.json")
+        with open(settings_path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["hooks"]["SessionStart"][0]["hooks"].append({
+            "type": "command", "shell": "bash",
+            "command": 'python "${CLAUDE_PROJECT_DIR}/.claude/hooks/ci_automation_audit.py"',
+            "statusMessage": "hand-wired already",
+        })
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        before_hooks = _session_start_hooks(target)
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="gitlab"))
+        assert summary["ci_audit_hook_wired"] is False
+        assert summary["ci_audit_hook_reason"] == (
+            "already wired (a prior run or a hand-edit already added the entry)")
+        assert _session_start_hooks(target) == before_hooks
+
+
+def test_ci_audit_hook_scan_tolerates_oddly_shaped_later_session_start_groups():
+    # the duplicate scan walks EVERY SessionStart group, but only the first
+    # is shape-validated — a project-owned settings.json with a later group
+    # that isn't a dict, or whose "hooks" isn't a list, must be skipped, not
+    # crash (the function's own docstring promises it never crashes)
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        settings_path = os.path.join(target, ".claude", "settings.json")
+        with open(settings_path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["hooks"]["SessionStart"].append("not-a-dict")
+        data["hooks"]["SessionStart"].append({"hooks": "not-a-list"})
+        data["hooks"]["SessionStart"].append({"hooks": ["not-a-dict-entry"]})
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+        summary = gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+        assert summary["ci_audit_hook_wired"] is True
+        with open(settings_path, encoding="utf-8") as f:
+            after = json.load(f)
+        # appended to the validated first group; the odd later groups survive untouched
+        assert any("ci_automation_audit.py" in h["command"]
+                   for h in after["hooks"]["SessionStart"][0]["hooks"])
+        assert after["hooks"]["SessionStart"][1:] == data["hooks"]["SessionStart"][1:]
+
+
+def test_ci_audit_hook_refuses_on_malformed_settings_json_writing_nothing():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        settings_path = os.path.join(target, ".claude", "settings.json")
+        with open(settings_path, "w", encoding="utf-8") as f:
+            f.write('{"hooks": {}}')  # no SessionStart at all
+        before = _repo_snapshot(target)
+
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="gitlab"))
+            assert False, "expected GenerationRefused"
+        except gps.GenerationRefused as e:
+            assert "--ci-provider none" in str(e), (
+                "the refusal must tell the user how to get unstuck, not just what's wrong")
+        after = _repo_snapshot(target)
+        assert before == after, "a refused generation must write nothing at all"
+
+
+def test_ci_audit_hook_refuses_every_malformed_settings_shape_writing_nothing():
+    # one case per refusal branch in _prepare_ci_audit_hook_settings — the
+    # sibling test above covers only "no SessionStart key"; reverting any one
+    # clause (e.g. the JSONDecodeError catch) would otherwise surface as a
+    # raw traceback instead of a GenerationRefused carrying the remedy
+    _require_env()
+    shapes = {
+        "not json at all": "{not json",
+        "valid json, top level not an object": '[{"hooks": {}}]',
+        "valid json, top level null": "null",
+        "hooks not a dict": '{"hooks": []}',
+        "SessionStart empty": '{"hooks": {"SessionStart": []}}',
+        "SessionStart not a list": '{"hooks": {"SessionStart": {"hooks": []}}}',
+        "first group hooks not a list": '{"hooks": {"SessionStart": [{"hooks": "x"}]}}',
+        "first group not a dict": '{"hooks": {"SessionStart": ["x"]}}',
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        settings_path = os.path.join(target, ".claude", "settings.json")
+        for label, content in shapes.items():
+            with open(settings_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            before = _repo_snapshot(target)
+            try:
+                gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+                assert False, f"{label}: expected GenerationRefused"
+            except gps.GenerationRefused as e:
+                assert "--ci-provider none" in str(e), label
+            assert _repo_snapshot(target) == before, f"{label}: wrote something"
+        # Not UTF-8 at all — UTF-16 with a BOM is what PowerShell 5.1's
+        # Out-File writes by default, so it's a realistic Windows artefact,
+        # and it raises UnicodeDecodeError (a ValueError, NOT a
+        # JSONDecodeError) before json.load ever sees a token
+        with open(settings_path, "wb") as f:
+            f.write('{"hooks": {"SessionStart": [{"hooks": []}]}}'.encode("utf-16"))
+        before = _repo_snapshot(target)
+        try:
+            gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+            assert False, "utf-16 settings.json: expected GenerationRefused"
+        except gps.GenerationRefused as e:
+            assert "--ci-provider none" in str(e)
+        assert _repo_snapshot(target) == before, "utf-16: wrote something"
+        # The OSError half of the first clause can't be reached through
+        # generate() with a MISSING file — _require_bootstrapped refuses on
+        # that first — so drive the function directly: a nonexistent path is
+        # the one OSError reproducible on every OS without permission games
+        try:
+            gps._prepare_ci_audit_hook_settings(os.path.join(tmp, "does-not-exist.json"))
+            assert False, "unreadable settings.json: expected GenerationRefused"
+        except gps.GenerationRefused as e:
+            assert "--ci-provider none" in str(e)
+
+
+def test_ci_audit_hook_splice_preserves_non_ascii_in_project_owned_settings():
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        settings_path = os.path.join(target, ".claude", "settings.json")
+        with open(settings_path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["hooks"]["SessionStart"][0]["hooks"][0]["statusMessage"] = "Prüfe Python…"
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+        with open(settings_path, encoding="utf-8") as f:
+            raw = f.read()
+        assert "Prüfe Python…" in raw, "the owner's own text must round-trip, not become \\uXXXX"
+
+
+def test_ci_audit_hook_actually_fires_end_to_end_from_the_generated_target():
+    # not just "the file exists" — proves the copied hook actually runs and
+    # emits its advisory note, the same technique smoke_test() uses for
+    # commit_review_gate.py
+    _require_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        target = _bootstrapped_target(tmp)
+        gps.generate(target, pps.SetupAnswers(dbt=True, ci_provider="github"))
+        workflows_dir = os.path.join(target, ".github", "workflows")
+        os.makedirs(workflows_dir, exist_ok=True)
+        with open(os.path.join(workflows_dir, "auto-merge.yml"), "w", encoding="utf-8") as f:
+            f.write(
+                "on:\n  schedule:\n    - cron: '0 0 * * *'\n"
+                "jobs:\n  merge:\n    steps:\n      - run: gh pr merge --auto\n")
+        hook_path = os.path.join(target, ".claude", "hooks", "ci_automation_audit.py")
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=target)
+        proc = subprocess.run([sys.executable, hook_path], input="{}", text=True,
+                               capture_output=True, cwd=target, env=env, timeout=30)
+        assert proc.returncode == 0
+        assert "CI-AUTOMATION AUDIT" in proc.stdout
+
+        # and silent when there's nothing to flag
+        os.remove(os.path.join(workflows_dir, "auto-merge.yml"))
+        proc2 = subprocess.run([sys.executable, hook_path], input="{}", text=True,
+                                capture_output=True, cwd=target, env=env, timeout=30)
+        assert proc2.returncode == 0
+        assert proc2.stdout.strip() == ""
+
+
 def test_generate_is_idempotent_on_a_second_run():
     _require_env()
     with tempfile.TemporaryDirectory() as tmp:

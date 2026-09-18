@@ -1,53 +1,52 @@
 # Review
 
-diff_sha256: 5efd74bc4bf6601a905dbfdf705beab1d9da06e9c962ce86fa1c28c7d28f9e92
+diff_sha256: 845cf557118635357834b30a65643a02b6fe8f16fe52be685695b34477289b96
 
-rounds: 12
+rounds: 4
 
-CPO ANSWER: round 3's cap was hit on the working-agreement.md mechanism specifically (three
-FAILs, all real defects in a git-history-based recognition design). Owner authorized a full
-rebuild on a static digest list rather than a fourth patch — see `.claude/task/contract.md`'s
-amendments log for the complete round-by-round account, including two further CPO ANSWERs
-(round 3's rebuild authorization, round 6's confirmation that a reason-string fix stayed
-in scope). Every round past the cap found a real, shrinking-severity defect: rounds 1-3
-found silent-data-loss-class bugs in the original design; round 4's rebuild itself needed
-correction for the same reason; rounds 5-8 found coverage gaps and doc/reason accuracy
-issues, including the ADR itself repeating the exact stale-doc pattern this whole feature
-exists to prevent (fixed by trimming it structurally rather than patching narrative);
-rounds 9-11 found the same self-referential defect recurring in smaller spots plus one real
-preview-note overclaim. Round 12 (both reviewers) is clean.
+CPO ANSWER: round 3 (this repo's cap) FAILed on two validation gaps in
+`_prepare_ci_audit_hook_settings` (non-object JSON top level → `AttributeError`; non-UTF-8 file →
+`UnicodeDecodeError` escaping the `except`). Owner authorised round 4 via `AskUserQuestion`
+("Yes, fix and run round 4") — see `.claude/task/contract.md`'s amendments for every round's
+findings and fixes. Round 4 (both reviewers) is clean.
 
 ## scope-auditor
-VERDICT: PASS (round 12, final)
+VERDICT: PASS (round 4, final)
 risks_checked:
-- Scope: all 14 changed files match `contract.md`'s `scope_paths` exactly, no drift.
-- `decisions_reserved` accurately reflects what was actually escalated across all 12 rounds
-  (build authorization, football-data-pipeline generalization check, this repo staying
-  Standard-only, plus the two mid-review CPO ANSWERs) — nothing decided silently.
-- Cross-repo boundary: zero changes to `football-data-pipeline`, `dbt-agent-kit`, or any
-  other repo.
-- Digest-list sync obligation is build-gated: `test_known_working_agreement_digests_lists_both_current_templates`
-  fails loudly if either template changes without its digest appended — same guard shape as
-  `test_routing_doc_parity.py`.
-- Asymmetric tier-switching correctness: bidirectional conversion, recognition of historical
-  digests, and force-flag scoping (overrides only unrecognised files, never a recognised
-  standard file of any vintage) are all covered by dedicated tests matching the actual
-  branches in `generate()`.
+- Scope: all 10 changed files inside `contract.md`'s `scope_paths`; nothing outside the branch's
+  objective (the worktree-safety ADR and headless-mode audit are explicitly NOT on this branch).
+- `decisions_reserved` covers every owner-level choice the diff embodies: wiring the CI-audit hook
+  at all, the programmatic `settings.json` splice, `templates/*` as a guard path, the drift fix.
+  The past-the-cap round is backed by a recorded CPO ANSWER.
+- User-visible wording (`ci_audit_hook_reason` strings, `ci_provider_note`, SKILL.md prompt,
+  refusal remedy text) traces to the contract's `done_when` "describe the new behavior accurately",
+  not to silent product decisions. `ensure_ascii=False` is a correctness fix under "never corrupt
+  the highest-blast-radius file", not a new mechanism.
+- `.claude/active_work.md` describes the state as of the commit; the three owner decisions this
+  branch resolves are removed and the one new open call (generated-project routing not covering
+  `.claude/settings.json`) is recorded as open, not acted on.
 
 ## platform-reviewer
-VERDICT: PASS (round 12, final — opus, guard paths touched: scripts/*, .claude/tests/*,
-.claude/skills/*)
+VERDICT: PASS (round 4, final — opus, guard paths touched: scripts/*, .claude/tests/*,
+templates/*, .claude/review_routing.json, .claude/skills/*)
 risks_checked:
-- Full fresh hunt-list pass found nothing new: no new dependency beyond stdlib
-  (`hashlib`/`json`/`re`), no CI/hook/permission/credential change, re-run and interruption
-  safety intact (every refusal precedes the first write; both tiers converge to a no-op on
-  re-run), fail-closed direction correct for a generator (a broken digest file raises
-  `GenerationRefused`, never silently treats content as recognised).
-- All 12 rounds' fixes verified present and consistent: the digest-based recognition
-  mechanism (no git subprocess, no `.kit-version` dependency), the asymmetric write logic
-  with force scoped to unrecognised files only, the `working_agreement_reason` string
-  structurally unable to disagree with the write decision, and full doc consistency across
-  `SKILL.md`, `README.md`, `docs/project-kit-design.md`, and the (now-trimmed, ~85-line) ADR.
-- No stale self-referential round-count language survives anywhere in the diff.
+- Round-3 fix completeness: enumerated the full exception surface of `open(encoding="utf-8")` +
+  `json.load` — every realistic operator artefact (missing file, permission, non-JSON, UTF-8 BOM,
+  UTF-16 BOM, non-object top level) lands in `GenerationRefused` with the remedy text. Only
+  `RecursionError` on adversarially nested JSON escapes, with nothing written — flagged
+  non-blocking for the owner.
+- `except ValueError` breadth: the `try` body is two statements with no callables of ours, so it
+  can't mask a logic bug; `{e!r}` and `from e` preserve the cause.
+- Every new test leg reaches the clause it claims (`_require_bootstrapped` is `isfile`-only; no
+  other `settings.json` read precedes the prep call); `_repo_snapshot` reads bytes so the
+  write-nothing assertion survives a UTF-16 file. Each fix verified to fail on revert.
+- Fail-open of the wired hook verified from the template's code, not its docstring; `generate()`
+  fails closed (every refusal precedes the first write).
+- Re-run/interruption: `settings.json` via `_write_atomic`; idempotency asserts exactly one marker
+  entry after two runs; `bootstrap.sh`'s `refresh_dir` is a non-deleting merge so a later
+  re-bootstrap doesn't orphan the entry.
+- Parity test is bidirectional, so the guard-path additions had to land in both files.
+- No new dependency, no credential/CI-permission change. Recurring cost (one hook process per
+  session in generated projects with a CI provider) is owner-decided in the contract.
 
-Full test suite: 226 passed, 0 failed (`python -m pytest .claude/tests/ -q`).
+Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows).
