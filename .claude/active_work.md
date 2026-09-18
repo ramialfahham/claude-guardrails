@@ -30,8 +30,14 @@ filename with that already-existing module) —
 `dbt-agent-kit`'s `scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate
 follow-up task in that repo (`task_5ad700d5`), deliberately not fixed here (cross-repo).
 
-The `origin` GitHub remote (`ramialfahham/claude-guardrails`) is permanently out of scope —
-account suspended (403), treat `gitlab` as the only remote, don't re-flag this.
+The `origin` GitHub remote (`ramialfahham/claude-guardrails`) came back after its 2026-09-17
+suspension. GitLab (`claude-project-kit`) stays primary for all active work — MRs, CI, reviews.
+GitHub is now a GitLab-native push mirror (Settings → Repository → Mirroring repositories,
+protected branches only), auto-syncing on every push; confirmed healthy via GitLab's API
+(`update_status: "finished"`, no error) and a matching `main` SHA on both remotes as of
+2026-09-18. No manual sync needed going forward — don't re-flag GitHub as dead, and don't push
+to it directly (the mirror handles it, and `branch_discipline.py` blocks a direct `main` push
+to any remote regardless).
 
 - The 7-phase `claude-project-kit` build (bootstrap + tailored `/setup-project` generation,
   reviewer module library, CI-provider audit) — complete. See `docs/project-kit-design.md`
