@@ -7,23 +7,22 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-**Branch `research/headless-mode-audit` — committed, MR open on GitLab, awaiting owner
-merge.** Item 4 of the owner's 4: `docs/decisions/headless-mode-compatibility.md`, doc-only.
-Six `claude -p` runs against a throwaway bootstrapped repo (v2.1.223, haiku): the review gate
-denies an unreviewed commit headless, denies it under `--dangerously-skip-permissions`, and
-allows it with a valid `review.md`; `SessionStart` injects the handover (so
-`${CLAUDE_PROJECT_DIR}` resolves); `AskUserQuestion` is not offered in `-p` at all. `--bare`
-(documented: skips hooks; needs `ANTHROPIC_API_KEY`, not OAuth) could not be run here. Also
-amends `auto-mode-and-bypass-compatibility.md`: its "not confirmed" bypass gap is now closed
-by a direct doc quote. No hook/script/test changes.
+Nothing is in flight. All 4 items the owner confirmed before the website-project test are
+merged: [MR !31](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/31)
+(CI-audit hook wired into generated projects; `templates/*` guard path + drift fix),
+[MR !33](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/33) (worktree
+ADR — one `git worktree` per concurrent session), and
+[MR !37](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/37) (headless
+ADR — `docs/decisions/headless-mode-compatibility.md`: the gate holds under `claude -p` and
+`--dangerously-skip-permissions`, observed; `AskUserQuestion` isn't offered in `-p`; `--bare`
+is the documented off-switch and slated to become `-p`'s default). In between,
+[MR !35](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/35) fixed the
+review process (round-completeness rule + claims-against-source hunt item in every reviewer
+module; builder pre-spawn self-check; 3-round cap left as-is — **revisit only if branches keep
+hitting the cap**; the two branches since stayed within it).
 
-Most recent merge before that —
-[MR !35](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/35): the
-review-process fix (round-completeness rule + claims-against-source hunt item in every
-reviewer module; builder pre-spawn self-check in both working agreements; 3-round cap left
-as-is — **revisit only if branches keep hitting the cap**).
-
-All 4 pre-website items are now done or in review. Next: the website-project test.
+**Next: the website-project test.** Not scoped — the owner names the project and what "test"
+means before anything is written; it gets its own contract.
 
 `/setup-project`'s interview now asks two more questions:
 [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28) added a
