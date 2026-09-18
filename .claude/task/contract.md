@@ -1,8 +1,8 @@
 # Task contract
 
-objective: Wire `templates/ci-audit/ci_automation_audit.py` into generated projects when a CI
-provider is given, add `templates/*` as a guard path, and fix `guard-paths.md`/`review_routing.json`
-drift against `templates/reviewers/routing/platform-reviewer.routing.json`.
+objective: Write the parallel-session/worktree safety ADR — record, with live evidence, whether
+this kit's review gate holds when more than one Claude Code session works on the same repo at
+once, and recommend `git worktree` for that case.
 
 tracking_issue: (none — this repo doesn't use an issue tracker for its own work yet;
 `.claude/active_work.md` is the handover mechanism instead)
@@ -10,79 +10,71 @@ tracking_issue: (none — this repo doesn't use an issue tracker for its own wor
 scope_paths:
   - .claude/task/contract.md
   - .claude/active_work.md
-  - .claude/review_routing.json
-  - .claude/rules/guard-paths.md
-  - scripts/generate_project_setup.py
-  - scripts/preview_project_setup.py
-  - .claude/tests/test_generate_project_setup.py
-  - .claude/tests/test_preview_project_setup.py
-  - .claude/skills/setup-project/SKILL.md
-  - templates/ci-audit/ci_automation_audit.py
+  - docs/decisions/parallel-sessions-use-worktrees.md
   - docs/project-kit-design.md
 
 decisions_reserved:
-  - Whether to build any of this at all — owner selected all 4 items via AskUserQuestion
-    ("Two quick decisions", "Fix guard-paths.md drift", "Write the worktree-safety ADR",
-    "Scope the headless-mode audit") when asked what to finish before moving to the
-    website-project test.
-  - Whether `ci_automation_audit.py` gets wired into generated projects — owner chose "Yes,
-    wire it into generated projects" over leaving it a template-only resource.
-  - Whether `templates/*` becomes a guard path — owner chose "Yes, add templates/* as a guard
-    path" over leaving it at normal review weight.
-  - How `generate()` should register the CI-audit hook in a target's `settings.json` — owner
-    was explicitly shown the tradeoff (print-instructions-for-a-human vs. programmatic JSON
-    splice, the latter touching the highest-blast-radius file in the kit) and chose the
-    programmatic splice.
+  - Whether to write this at all — owner selected "Write the worktree-safety ADR" via
+    AskUserQuestion as item 3 of 4, and gave "go" after a plain-language restatement of the
+    ADR's scope (doc-only, leads with the worktree recommendation, records the same-directory
+    caveats, no hook changes).
+  - Anything that would close the same-directory TOCTOU gap (OS-level locking, a new hook, a
+    change to `commit_review_gate.py`) — explicitly NOT in scope; the ADR records it as a known
+    limit for the owner to decide on separately, if ever.
+  - Whether the recommendation becomes something `bootstrap.sh` or `/setup-project` prints or
+    enforces — not decided here; the ADR is documentation only.
 
 done_when:
-  - `templates/*`, `.gitlab-ci.yml`, and `package*.json` are guard paths in both
-    `review_routing.json` and `guard-paths.md`; `test_routing_doc_parity.py` passes.
-  - `generate()` installs `ci_automation_audit.py` into a target's `.claude/hooks/` and
-    idempotently wires a `SessionStart` entry into `settings.json` whenever
-    `answers.ci_provider != "none"`, raising `GenerationRefused` (nothing written) on an
-    unexpected `settings.json` shape rather than guessing at a structure to bolt onto —
-    consistent with every other check in this file (validate-then-write, never
-    write-then-maybe-refuse).
-  - The installed hook is proven to actually run and emit its advisory note against a real
-    workflow file, not just proven to exist on disk.
-  - `SKILL.md`, `preview_project_setup.py`'s `ci_provider_note`, and
-    `docs/project-kit-design.md` all describe the new behavior accurately.
-  - Full test suite (`.claude/tests/`) passes.
+  - `docs/decisions/parallel-sessions-use-worktrees.md` exists, matches the shape of this repo's
+    other ADRs (Status / Context / Decision / Why / what is NOT covered / Consequences), and
+    every behavioural claim in it was reproduced by actually running it in a throwaway repo
+    during this task — not carried over from an earlier session's notes.
+  - `docs/project-kit-design.md` links to it from the hardening section, next to the sandboxing
+    ADR.
+  - No code, hook, template, or test changes.
+  - Full test suite (`.claude/tests/`) still passes (nothing should have changed — a sanity check
+    that nothing did).
 
 amendments:
-  - 2026-09-18 — platform-reviewer's first review pass (opus) FAILed on two findings, scope-auditor
-    PASSed clean. Both fixed:
-    1. `_prepare_ci_audit_hook_settings` has five refusal branches but only "no SessionStart key"
-       was tested — reverting e.g. the `JSONDecodeError` clause would have surfaced as a raw
-       traceback with nothing catching it. Fixed:
-       `test_ci_audit_hook_refuses_every_malformed_settings_shape_writing_nothing` drives every
-       branch, asserting the remedy text and a byte-identical target each time.
-    2. `.claude/active_work.md` described the branch as "uncommitted, awaiting verdicts" with a
-       stale test count — false from the moment it's committed. Fixed: now describes the state as
-       of the commit (committed, MR open, awaiting owner merge), no live test count. Also removed
-       the three "open owner decisions" this very branch resolves, which the prior session left
-       listed.
-    Also taken from the reviewer's non-blocking notes: the settings.json splice now serialises
-    with `ensure_ascii=False` (project-owned file — an owner's non-ASCII `statusMessage` must not
-    be rewritten to `\uXXXX` escapes as a side effect of one append), with a round-trip test. The
-    reviewer's third note — a generated project's routing doesn't cover `.claude/settings.json`
-    — is an owner call, recorded in `active_work.md`'s open decisions, not acted on here.
-  - 2026-09-18 — platform-reviewer's second review pass (opus, round 2) FAILed on one leftover
-    hole in round 1's own fix: the new test's "missing file" leg went through `generate()`, which
-    `_require_bootstrapped` refuses BEFORE `_prepare_ci_audit_hook_settings` is ever called — so
-    the `OSError` half of that function's first clause had no test that fails on revert, and the
-    test's comment claimed coverage that wasn't there. Fixed: that leg now calls the function
-    directly on a nonexistent path and asserts the remedy text; comment and this log corrected.
-  - 2026-09-18 — platform-reviewer's third review pass (opus, round 3 — this repo's cap)
-    confirmed round 2's fix, then FAILed on two new inputs that escape
-    `_prepare_ci_audit_hook_settings` as raw tracebacks instead of `GenerationRefused` (nothing
-    written either way — wrong exception type and no remedy text, never corruption): valid JSON
-    whose top level isn't an object (`[]`, `null`) hit `data.get` with no `isinstance` guard, and
-    a non-UTF-8 file (UTF-16 with BOM — PowerShell 5.1's `Out-File` default) raised
-    `UnicodeDecodeError`, a `ValueError` that isn't a `JSONDecodeError`.
+  - 2026-09-18 — platform-reviewer's first pass (sonnet, spawned voluntarily — `docs/*` isn't
+    routed to it — because the ADR makes claims about hook behaviour) FAILed on two findings;
+    scope-auditor PASSed. Both were real and both fixed:
+    1. The ADR's central sentence — "nothing the gate relies on lives in the shared `.git`" —
+       was false: the base-branch ref `commit_review_gate.py` uses for the merge-base is shared
+       across worktrees. The first draft inferred this from git's model and presented it as
+       observed. Fixed by actually running it (rows 7–10): a sibling fast-forwarding or amending
+       `main` leaves the hash unchanged; merging the branch into `main` or rewriting `main`'s
+       history changes it — always as a spurious deny, never a bypass. ADR argument and the
+       `docs/project-kit-design.md` paragraph rewritten to say exactly that.
+    2. "Stateless" was claimed for `completion_gate.py`, which (like `handover_plan_gate.py`,
+       previously unmentioned) keeps a session-keyed marker in the OS temp dir. Fixed: the ADR
+       now distinguishes the two blocking hooks (stateless) from the two advisory ones (marker
+       state, never a `permissionDecision`).
+    The first re-run of row 9/10's check was itself invalid (a scripted edit adding the branch
+    commit silently failed to apply, so "cumulative" and "staged-only" coincided and every case
+    read UNCHANGED); caught by noticing the hash was byte-identical to a different fixture's,
+    fixed, re-run. Noted here because it's the same trap the ADR warns about — an "observation"
+    that observed nothing.
+  - 2026-09-18 — platform-reviewer's second pass (sonnet, round 2) FAILed on two more claims,
+    scope-auditor PASSed. Both real, both fixed:
+    1. Round 1's fix said both advisory hooks fire "once per session". True for
+       `handover_plan_gate.py` (existence marker); false for `completion_gate.py`, whose marker
+       is a hash of the last reason and re-fires on any change. Fixed: the ADR now describes
+       the two mechanisms separately.
+    2. Row 8 ("amend `main`'s tip → unchanged") was stated unconditionally but only holds when
+       the amended commit isn't the fork point. Run live: amending the fork-point commit itself
+       moves the merge-base back one commit and changes the hash. Fixed: split into 8a
+       (past the fork point — unchanged) and 8b (is the fork point — changes), both observed,
+       with the ADR noting that row 8 was first written from a run that happened to satisfy
+       8a's precondition.
+  - 2026-09-18 — platform-reviewer's third pass (sonnet, round 3 — this repo's cap) confirmed
+    round 2's fixes, then FAILed on one enumeration error: "the two hooks that can block" —
+    `secret_scan.py` is a third (denies a commit when the staged diff matches a credential
+    shape), wired in the same PreToolUse group, unmentioned anywhere in the ADR. scope-auditor
+    PASSed.
 
     **CPO ANSWER** (owner decision via `AskUserQuestion`, "Yes, fix and run round 4"): authorised
-    one round past the cap for this. Fixed: `isinstance(data, dict)` guard before the `hooks`
-    lookup; the `except` widened to `(OSError, ValueError)`; three cases added to
-    `test_ci_audit_hook_refuses_every_malformed_settings_shape_writing_nothing` (top-level list,
-    top-level null, UTF-16 bytes), each verified to fail with the fix reverted.
+    one round past the cap. Fixed: grep across `.claude/hooks/` confirms exactly three hooks call
+    `emit_deny` (`commit_review_gate`, `branch_discipline`, `secret_scan`), all stateless; the ADR
+    now names all three, notes `secret_scan.py` shares the approval-to-execution window, and
+    lists it alongside `branch_discipline.py` in "not covered" as wired-but-not-exercised.

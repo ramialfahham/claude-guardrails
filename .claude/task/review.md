@@ -1,52 +1,48 @@
 # Review
 
-diff_sha256: 845cf557118635357834b30a65643a02b6fe8f16fe52be685695b34477289b96
+diff_sha256: 0bd9082e245cf270125e681f3bb6e19e71a310a8bbc3dedbc7ca0e5b69aeed1c
 
 rounds: 4
 
-CPO ANSWER: round 3 (this repo's cap) FAILed on two validation gaps in
-`_prepare_ci_audit_hook_settings` (non-object JSON top level → `AttributeError`; non-UTF-8 file →
-`UnicodeDecodeError` escaping the `except`). Owner authorised round 4 via `AskUserQuestion`
+CPO ANSWER: round 3 (this repo's cap) FAILed on an enumeration error in the ADR (two blocking
+hooks named; `secret_scan.py` is a third). Owner authorised round 4 via `AskUserQuestion`
 ("Yes, fix and run round 4") — see `.claude/task/contract.md`'s amendments for every round's
 findings and fixes. Round 4 (both reviewers) is clean.
 
 ## scope-auditor
 VERDICT: PASS (round 4, final)
 risks_checked:
-- Scope: all 10 changed files inside `contract.md`'s `scope_paths`; nothing outside the branch's
-  objective (the worktree-safety ADR and headless-mode audit are explicitly NOT on this branch).
-- `decisions_reserved` covers every owner-level choice the diff embodies: wiring the CI-audit hook
-  at all, the programmatic `settings.json` splice, `templates/*` as a guard path, the drift fix.
-  The past-the-cap round is backed by a recorded CPO ANSWER.
-- User-visible wording (`ci_audit_hook_reason` strings, `ci_provider_note`, SKILL.md prompt,
-  refusal remedy text) traces to the contract's `done_when` "describe the new behavior accurately",
-  not to silent product decisions. `ensure_ascii=False` is a correctness fix under "never corrupt
-  the highest-blast-radius file", not a new mechanism.
-- `.claude/active_work.md` describes the state as of the commit; the three owner decisions this
-  branch resolves are removed and the one new open call (generated-project routing not covering
-  `.claude/settings.json`) is recorded as open, not acted on.
+- Scope: the 3 non-bookkeeping changed files (new ADR, `docs/project-kit-design.md`,
+  `.claude/active_work.md`) plus the contract are all inside `scope_paths`; no hook, script,
+  template, or test changed — doc-only as the contract requires.
+- Reserved decisions respected: the ADR RECORDS the approval-to-execution gap and the
+  shared-base-ref behaviour; it does not propose a lock, a pre-commit hook, or any
+  bootstrap/setup-project enforcement as adopted. The past-the-cap round has a recorded owner
+  authority.
+- The "not covered" section distinguishes structural facts read from source (the hooks'
+  PreToolUse timing) from behavioural runs that were not done (`branch_discipline.py`,
+  `secret_scan.py` against a sibling worktree) — no claimed verification that didn't happen.
 
 ## platform-reviewer
-VERDICT: PASS (round 4, final — opus, guard paths touched: scripts/*, .claude/tests/*,
-templates/*, .claude/review_routing.json, .claude/skills/*)
+VERDICT: PASS (round 4, final — sonnet; `docs/*` is not a guard path, reviewer spawned
+voluntarily because the ADR makes claims about hook behaviour)
 risks_checked:
-- Round-3 fix completeness: enumerated the full exception surface of `open(encoding="utf-8")` +
-  `json.load` — every realistic operator artefact (missing file, permission, non-JSON, UTF-8 BOM,
-  UTF-16 BOM, non-object top level) lands in `GenerationRefused` with the remedy text. Only
-  `RecursionError` on adversarially nested JSON escapes, with nothing written — flagged
-  non-blocking for the owner.
-- `except ValueError` breadth: the `try` body is two statements with no callables of ours, so it
-  can't mask a logic bug; `{e!r}` and `from e` preserve the cause.
-- Every new test leg reaches the clause it claims (`_require_bootstrapped` is `isfile`-only; no
-  other `settings.json` read precedes the prep call); `_repo_snapshot` reads bytes so the
-  write-nothing assertion survives a UTF-16 file. Each fix verified to fail on revert.
-- Fail-open of the wired hook verified from the template's code, not its docstring; `generate()`
-  fails closed (every refusal precedes the first write).
-- Re-run/interruption: `settings.json` via `_write_atomic`; idempotency asserts exactly one marker
-  entry after two runs; `bootstrap.sh`'s `refresh_dir` is a non-deleting merge so a later
-  re-bootstrap doesn't orphan the entry.
-- Parity test is bidirectional, so the guard-path additions had to land in both files.
-- No new dependency, no credential/CI-permission change. Recurring cost (one hook process per
-  session in generated projects with a CI provider) is owner-decided in the contract.
+- Blocking-hook enumeration: grep of `emit_deny`/`permissionDecision` across `.claude/hooks/*.py`
+  — exactly `commit_review_gate.py`, `branch_discipline.py`, `secret_scan.py` call it;
+  `_command_utils.py` only defines it; `pre_push_gate.py`, `plan_implement_gate.py`,
+  `handover_in.py`, `handover_out.py` have no deny path. Matches the ADR.
+- "Stateless" for all three blocking hooks: `secret_scan.py` runs `git diff --staged` fresh each
+  time, no marker/tempfile; `branch_discipline.py` likewise. The two advisory hooks' marker
+  mechanisms are now described per hook (existence marker vs. last-reason hash) and neither
+  sets a `permissionDecision`.
+- Rows 7–10 (shared base-branch ref) mechanisms verified against `_base_ref`/`_merge_base`/
+  `_diff_to_hash`: fast-forward and past-fork-point amend leave the merge-base; merging the
+  branch moves it to the branch tip; amending the fork-point commit or replacing history moves
+  it back / removes it (staged-only fallback). "Always a deny, never a bypass" holds — only
+  byte-identical content reproduces a recorded SHA-256.
+- Approval-to-execution window described accurately for a `PreToolUse` hook, and its identical
+  shape in `secret_scan.py` now stated.
+- `docs/project-kit-design.md` paragraph agrees with the ADR; `.claude/active_work.md` accurate.
 
-Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows).
+Full test suite: 237 passed, 0 failed (`python -m pytest .claude/tests/ -q`, Windows) — a
+no-change sanity check, since the diff touches no code.
