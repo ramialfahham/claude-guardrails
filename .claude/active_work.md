@@ -7,13 +7,22 @@ still true or still open, it doesn't belong in this file.
 
 ## Where things stand
 
-All planned work is merged to `main`. Nothing is in flight.
+One thing in flight: [MR !28](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/28)
+(`feat/tracker-convention-and-process-tier`) — a tracker-based roadmap convention (roadmap is
+the tracker's issues/milestones, never a markdown file, generalizing `football-data-pipeline`'s
+own real fix) plus a Solo/Standard process-tier question in `/setup-project`'s interview.
+Reviewed clean (`scope-auditor` PASS, `platform-reviewer` PASS at opus) after 12 review rounds
+— 3 past this repo's cap, owner-authorized to rebuild the tier-recognition mechanism from a
+git-history reconstruction (had a real coupling bug with `bootstrap.sh`'s own conventions) onto
+a static digest list. Full account in that branch's `.claude/task/contract.md`. Pushed,
+awaiting owner merge.
 
-This repo was renamed `claude-guardrails` → `claude-project-kit`
-(`rami.al-fahham/claude-project-kit` on GitLab; local `gitlab` remote repointed), and this
-kit's own self-governance reviewer, `.claude/agents/cto-reviewer.md`, was retired in favor of
-using `templates/reviewers/platform-reviewer.md` directly (a straight rename would have
-collided by filename with that already-existing module) —
+Otherwise, all prior planned work is merged to `main`. This repo was renamed
+`claude-guardrails` → `claude-project-kit` (`rami.al-fahham/claude-project-kit` on GitLab;
+local `gitlab` remote repointed), and this kit's own self-governance reviewer,
+`.claude/agents/cto-reviewer.md`, was retired in favor of using
+`templates/reviewers/platform-reviewer.md` directly (a straight rename would have collided by
+filename with that already-existing module) —
 [MR !26](https://gitlab.com/rami.al-fahham/claude-project-kit/-/merge_requests/26), merged.
 `dbt-agent-kit`'s `scripts/sync-base.sh` still hardcodes the old URL — flagged as a separate
 follow-up task in that repo (`task_5ad700d5`), deliberately not fixed here (cross-repo).
